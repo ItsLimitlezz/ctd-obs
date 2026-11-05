@@ -715,7 +715,7 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 #ifdef _WIN32
 
 #define CRASH_MESSAGE                                                      \
-	"Woops, OBS has crashed!\n\nWould you like to copy the crash log " \
+	"Woops, CTD OBS has crashed!\n\nWould you like to copy the crash log " \
 	"to the clipboard? The crash log will still be saved to:\n\n%s"
 
 static void main_crash_handler(const char *format, va_list args, void * /* param */)
@@ -762,7 +762,7 @@ static void main_crash_handler(const char *format, va_list args, void * /* param
 
 	string finalMessage = string(message_buffer.get(), message_buffer.get() + size);
 
-	int ret = MessageBoxA(NULL, finalMessage.c_str(), "OBS has crashed!", MB_YESNO | MB_ICONERROR | MB_TASKMODAL);
+	int ret = MessageBoxA(NULL, finalMessage.c_str(), "CTD OBS has crashed!", MB_YESNO | MB_ICONERROR | MB_TASKMODAL);
 
 	if (ret == IDYES) {
 		size_t len = strlen(text);
