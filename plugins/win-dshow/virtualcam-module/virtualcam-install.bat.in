@@ -12,42 +12,42 @@ goto checkAdmin
 	)
 
 :install32DLL
-	echo Installing 32-bit Virtual Cam...
-	if exist "%~dp0\core\win-dshow\data\obs-virtualcam-module32.dll" (
-		regsvr32.exe /i /s "%~dp0\core\win-dshow\data\obs-virtualcam-module32.dll"
+	echo Installing 32-bit CTD OBS Virtual Cam...
+	if exist "%~dp0\core\win-dshow\data\ctd-obs-virtualcam-module32.dll" (
+		regsvr32.exe /i /s "%~dp0\core\win-dshow\data\ctd-obs-virtualcam-module32.dll"
 	) else (
-		regsvr32.exe /i /s obs-virtualcam-module32.dll
+		regsvr32.exe /i /s ctd-obs-virtualcam-module32.dll
 	)
 	reg query "HKLM\SOFTWARE\Classes\WOW6432Node\CLSID\{@VIRTUALCAM_GUID@}" >nul 2>&1
 	if %errorLevel% == 0 (
-		echo 32-bit Virtual Cam successfully installed
+		echo 32-bit CTD OBS Virtual Cam successfully installed
 		echo.
 	) else (
-		echo 32-bit Virtual Cam installation failed
+		echo 32-bit CTD OBS Virtual Cam installation failed
 		echo.
 		goto end
 	)
 
 :install64DLL
-	echo Installing 64-bit Virtual Cam...
-	if exist "%~dp0\core\win-dshow\data\obs-virtualcam-module64.dll" (
-		regsvr32.exe /i /s "%~dp0\core\win-dshow\data\obs-virtualcam-module64.dll"
+	echo Installing 64-bit CTD OBS Virtual Cam...
+	if exist "%~dp0\core\win-dshow\data\ctd-obs-virtualcam-module64.dll" (
+		regsvr32.exe /i /s "%~dp0\core\win-dshow\data\ctd-obs-virtualcam-module64.dll"
 	) else (
-		regsvr32.exe /i /s obs-virtualcam-module64.dll
+		regsvr32.exe /i /s ctd-obs-virtualcam-module64.dll
 	)
 	reg query "HKLM\SOFTWARE\Classes\CLSID\{@VIRTUALCAM_GUID@}" >nul 2>&1
 	if %errorLevel% == 0 (
-		echo 64-bit Virtual Cam successfully installed
+		echo 64-bit CTD OBS Virtual Cam successfully installed
 		echo.
 		goto endSuccess
 	) else (
-		echo 64-bit Virtual Cam installation failed
+		echo 64-bit CTD OBS Virtual Cam installation failed
 		echo.
 		goto end
 	)
 
 :endSuccess
-	echo Virtual Cam installed!
+	echo CTD OBS Virtual Cam installed!
 	echo.
 
 :end

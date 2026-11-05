@@ -1,4 +1,4 @@
-LIBRARY     obs-virtualcam-module@_output_suffix@.dll
+LIBRARY     ctd-obs-virtualcam-module@_output_suffix@.dll
 EXPORTS
             DllMain                 PRIVATE
             DllGetClassObject       PRIVATE
