@@ -51,9 +51,9 @@ function Package {
     $CommitDistance = $Tokens[-2]
 
     if ( $CommitDistance -gt 0 ) {
-        $OutputName = "obs-studio-${CommitVersion}-${CommitHash}"
+        $OutputName = "ctd-obs-${CommitVersion}-${CommitHash}"
     } else {
-        $OutputName = "obs-studio-${CommitVersion}"
+        $OutputName = "ctd-obs-${CommitVersion}"
     }
 
     $CpackArgs = @(
@@ -64,13 +64,13 @@ function Package {
         $CpackArgs += ('--verbose')
     }
 
-    Log-Group "Packaging obs-studio..."
+    Log-Group "Packaging ctd-obs..."
 
     Push-Location -Stack PackageTemp "build_${Target}"
 
     cpack @CpackArgs
 
-    $Package = Get-ChildItem -filter "obs-studio-*-windows-${Target}.zip" -File
+    $Package = Get-ChildItem -filter "ctd-obs-*-windows-${Target}.zip" -File
     Move-Item -Path $Package -Destination "${OutputName}-windows-${Target}.zip"
 
     Pop-Location -Stack PackageTemp

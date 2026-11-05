@@ -32,9 +32,9 @@ VCamFilter::VCamFilter() : OutputFilter()
 	}
 
 #ifdef _WIN64
-	const wchar_t *obs_process = L"obs64.exe";
+	const wchar_t *obs_process = L"ctd-obs64.exe";
 #else
-	const wchar_t *obs_process = L"obs32.exe";
+	const wchar_t *obs_process = L"ctd-obs32.exe";
 #endif
 
 	in_obs = !!wcsstr(file, obs_process);

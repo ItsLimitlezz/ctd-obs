@@ -39,4 +39,4 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ctd-obs-windows-x64-${{ github.sha }}
-          path: ${{ github.workspace }}/build_x64/obs-studio-*-windows-x64.zip
+          path: ${{ github.workspace }}/build_x64/ctd-obs-*-windows-x64.zip
