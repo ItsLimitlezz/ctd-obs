@@ -10,7 +10,7 @@ Base: OBS Studio 33.0.1.
 | Config | `ctd-obs` folder instead of `obs-studio` for settings, scenes, logs, plugins and the shader cache | `frontend/` paths, `libobs-d3d11/d3d11-subsystem.cpp`, `libobs-d3d11/d3d11-shader.cpp` |
 | Running beside OBS | Its own single-instance check | `frontend/utility/platform-windows.cpp` |
 | Updates | Updater off, update menu items hidden | `frontend/obs-main.cpp`, `frontend/widgets/OBSBasic.cpp` |
-| OBS's servers | No What's New, service list or game-capture data downloads | `frontend/cmake/feature-whatsnew.cmake`, `plugins/rtmp-services/CMakeLists.txt`, `plugins/win-capture/plugin-main.c` |
+| OBS's servers | No What's New, service list, game-capture data or wizard platform ingest downloads | `frontend/cmake/feature-whatsnew.cmake`, `plugins/rtmp-services/CMakeLists.txt`, `plugins/win-capture/plugin-main.c` |
 | Reports | No crash report offer; log upload, help, website and Discord menu items hidden | `frontend/OBSApp.cpp`, `frontend/widgets/OBSBasic.cpp` |
 | Name | Window title, Windows file details, About text (English) | `frontend/widgets/OBSBasic.cpp`, `frontend/cmake/windows/obs.rc.in`, `frontend/data/locale/en-US.ini` |
 | Look | CTD Night theme as the default, Space Mono font, CTD icons | `frontend/data/themes/CTD_Night.ovt`, `frontend/cmake/templates/ui-config.h.in`, `frontend/obs-main.cpp`, `frontend/forms/obs.qrc`, `frontend/forms/fonts/`, `frontend/forms/images/`, `frontend/cmake/windows/obs-studio.ico` |

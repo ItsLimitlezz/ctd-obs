@@ -58,13 +58,7 @@ AutoConfig::AutoConfig(QWidget *parent) : QWizard(parent)
 {
 	EnableThreadedMessageBoxes(true);
 
-	calldata_t cd = {0};
-	calldata_set_int(&cd, "seconds", 5);
-
-	proc_handler_t *ph = obs_get_proc_handler();
-	proc_handler_call(ph, "twitch_ingests_refresh", &cd);
-	proc_handler_call(ph, "amazon_ivs_ingests_refresh", &cd);
-	calldata_free(&cd);
+	/* CTD OBS: the wizard offers only CTD Relay and Custom RTMP, so it doesn't fetch platform ingest lists */
 
 	OBSBasic *main = OBSBasic::Get();
 	main->EnableOutputs(false);
