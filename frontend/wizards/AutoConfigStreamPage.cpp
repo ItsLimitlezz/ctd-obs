@@ -452,6 +452,8 @@ void AutoConfigStreamPage::ServiceChanged()
 		return;
 	}
 
+	ui->customServer->setPlaceholderText(ui->service->currentIndex() == 0 ? QTStr("CTD.Relay.Hint") : QString());
+
 	std::string service = ui->service->currentText().toStdString();
 	bool regionBased = service == "Twitch";
 	bool testBandwidth = ui->doBandwidthTest->isChecked();
@@ -640,16 +642,9 @@ void AutoConfigStreamPage::LoadServices(bool showAll)
 		names.sort(Qt::CaseInsensitive);
 	}
 
-	for (QString &name : names) {
-		ui->service->addItem(name);
-	}
-
-	if (!showAll) {
-		ui->service->addItem(QTStr("Basic.AutoConfig.StreamPage.Service.ShowAll"),
-				     QVariant((int)ListOpt::ShowAll));
-	}
-
-	ui->service->insertItem(0, QTStr("Basic.AutoConfig.StreamPage.Service.Custom"), QVariant((int)ListOpt::Custom));
+	/* CTD OBS streams to CTD Relay or a plain RTMP server. Both use the custom server form. */
+	ui->service->addItem(QTStr("CTD.Relay"), QVariant((int)ListOpt::Custom));
+	ui->service->addItem(QTStr("Basic.AutoConfig.StreamPage.Service.Custom"), QVariant((int)ListOpt::Custom));
 
 	if (!lastService.isEmpty()) {
 		int idx = ui->service->findText(lastService);

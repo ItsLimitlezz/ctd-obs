@@ -63,7 +63,7 @@ bool OBSBasic::LoadService()
 	}
 
 	const char *type;
-	obs_data_set_default_string(data, "type", "rtmp_common");
+	obs_data_set_default_string(data, "type", "rtmp_custom");
 	type = obs_data_get_string(data, "type");
 
 	OBSDataAutoRelease settings = obs_data_get_obj(data, "settings");
@@ -102,7 +102,7 @@ bool OBSBasic::InitService()
 		return true;
 	}
 
-	service = obs_service_create("rtmp_common", "default_service", nullptr, nullptr);
+	service = obs_service_create("rtmp_custom", "default_service", nullptr, nullptr);
 	if (!service) {
 		return false;
 	}
@@ -114,7 +114,7 @@ bool OBSBasic::InitService()
 obs_service_t *OBSBasic::GetService()
 {
 	if (!service) {
-		service = obs_service_create("rtmp_common", NULL, NULL, nullptr);
+		service = obs_service_create("rtmp_custom", NULL, NULL, nullptr);
 		obs_service_release(service);
 	}
 	return service;

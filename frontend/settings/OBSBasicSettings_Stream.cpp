@@ -119,8 +119,12 @@ void OBSBasicSettings::LoadStream1Settings()
 	}
 
 	if (is_rtmp_custom) {
-		ui->service->setCurrentIndex(0);
-		lastServiceIdx = 0;
+		/* CTD OBS: item 0 is CTD Relay, item 1 is plain RTMP. A new profile starts on CTD Relay. */
+		const bool plainRtmp = *obs_data_get_string(settings, "server") &&
+				       !obs_data_get_bool(settings, "ctd_relay");
+		lastServiceIdx = plainRtmp ? 1 : 0;
+		ui->service->setCurrentIndex(lastServiceIdx);
+		ui->customServer->setPlaceholderText(plainRtmp ? QString() : QTStr("CTD.Relay.Hint"));
 		lastCustomServer = ui->customServer->text();
 
 		bool use_auth = obs_data_get_bool(settings, "use_auth");
@@ -293,6 +297,9 @@ void OBSBasicSettings::SaveStream1Settings()
 		}
 	} else {
 		obs_data_set_string(settings, "server", QT_TO_UTF8(ui->customServer->text().trimmed()));
+		if (customServer) {
+			obs_data_set_bool(settings, "ctd_relay", ui->service->currentIndex() == 0);
+		}
 		obs_data_set_bool(settings, "use_auth", ui->useAuth->isChecked());
 		if (ui->useAuth->isChecked()) {
 			obs_data_set_string(settings, "username", QT_TO_UTF8(ui->authUsername->text()));
@@ -487,20 +494,10 @@ void OBSBasicSettings::LoadServices(bool showAll)
 		names.sort(Qt::CaseInsensitive);
 	}
 
-	for (QString &name : names) {
-		ui->service->addItem(name);
-	}
-
-	if (obs_is_output_protocol_registered("WHIP")) {
-		ui->service->addItem(QTStr("WHIP"), QVariant((int)ListOpt::WHIP));
-	}
-
-	if (!showAll) {
-		ui->service->addItem(QTStr("Basic.AutoConfig.StreamPage.Service.ShowAll"),
-				     QVariant((int)ListOpt::ShowAll));
-	}
-
-	ui->service->insertItem(0, QTStr("Basic.AutoConfig.StreamPage.Service.Custom"), QVariant((int)ListOpt::Custom));
+	/* CTD OBS streams to CTD Relay or a plain RTMP server. Both use the custom server form; the plugin's
+	 * CTD Relay dock fills it in. */
+	ui->service->addItem(QTStr("CTD.Relay"), QVariant((int)ListOpt::Custom));
+	ui->service->addItem(QTStr("Basic.AutoConfig.StreamPage.Service.Custom"), QVariant((int)ListOpt::Custom));
 
 	if (!lastService.isEmpty()) {
 		int idx = ui->service->findText(lastService);
@@ -581,6 +578,8 @@ void OBSBasicSettings::on_service_currentIndexChanged(int idx)
 		ui->service->showPopup();
 		return;
 	}
+
+	ui->customServer->setPlaceholderText(idx == 0 ? QTStr("CTD.Relay.Hint") : QString());
 
 	ServiceChanged();
 

@@ -14,6 +14,8 @@ Base: OBS Studio 33.0.1.
 | Reports | No crash report offer; log upload, help, website and Discord menu items hidden | `frontend/OBSApp.cpp`, `frontend/widgets/OBSBasic.cpp` |
 | Name | Window title, Windows file details, About text (English) | `frontend/widgets/OBSBasic.cpp`, `frontend/cmake/windows/obs.rc.in`, `frontend/data/locale/en-US.ini` |
 | Look | CTD Night theme as the default, Space Mono font, CTD icons | `frontend/data/themes/CTD_Night.ovt`, `frontend/cmake/templates/ui-config.h.in`, `frontend/obs-main.cpp`, `frontend/forms/obs.qrc`, `frontend/forms/fonts/`, `frontend/forms/images/`, `frontend/cmake/windows/obs-studio.ico` |
+| Streaming | Service lists offer only CTD Relay and Custom RTMP; new profiles use a custom server | `frontend/settings/OBSBasicSettings_Stream.cpp`, `frontend/wizards/AutoConfigStreamPage.cpp`, `frontend/wizards/AutoConfig.cpp`, `frontend/widgets/OBSBasic_Service.cpp`, `frontend/data/locale/en-US.ini` |
+| CTD plugin | Built in as a core module, from a submodule | `plugins/ctd-live-source`, `plugins/CMakeLists.txt`, `.gitmodules` |
 | Build | Windows x64 CI | `.github/workflows/ctd-windows.yaml` |
 
 ## Not changed yet

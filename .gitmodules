@@ -7,3 +7,7 @@
 [submodule "plugins/obs-websocket"]
 	path = plugins/obs-websocket
 	url = https://github.com/obsproject/obs-websocket.git
+[submodule "plugins/ctd-live-source"]
+	path = plugins/ctd-live-source
+	url = https://github.com/ItsLimitlezz/ctd-obs-plugin.git
+	branch = ctd-obs-in-tree

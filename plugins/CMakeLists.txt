@@ -50,6 +50,7 @@ add_core_module(
 )
 add_core_module(aja-output-ui PLATFORMS WINDOWS MACOS LINUX WITH_MESSAGE)
 add_core_module(coreaudio-encoder PLATFORMS WINDOWS MACOS)
+add_core_module(ctd-live-source PLATFORMS WINDOWS)
 add_core_module(
     decklink
     PLATFORMS WINDOWS MACOS LINUX
