@@ -363,6 +363,13 @@ void OBSBasic::ChangeSceneCollection()
 
 	SceneCollection &selectedCollection = foundCollection.value();
 
+	/* CTD: no scene collection switch while any output (including plugin outputs) is active. */
+	if (CtdAnyOutputActive()) {
+		action->setChecked(false);
+		RefreshSceneCollections();
+		return;
+	}
+
 	OnEvent(OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGING);
 
 	ActivateSceneCollection(selectedCollection);
