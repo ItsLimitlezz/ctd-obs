@@ -118,10 +118,9 @@ bool obs_module_load(void)
 	if (config_dir) {
 		os_mkdirs(config_dir);
 
-		if (local_dir) {
-			update_info = update_info_create(WIN_CAPTURE_LOG_STRING, WIN_CAPTURE_VER_STRING, update_url,
-							 local_dir, config_dir, confirm_compat_file, NULL);
-		}
+		/* CTD OBS: use the compatibility data that ships with the app; don't fetch it from the OBS Project */
+		UNUSED_PARAMETER(update_url);
+		UNUSED_PARAMETER(confirm_compat_file);
 	}
 	bfree(config_dir);
 	bfree(local_dir);

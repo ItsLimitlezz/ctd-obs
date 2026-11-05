@@ -7,14 +7,14 @@ BEGIN
   BEGIN
     BLOCK "040904B0"
     BEGIN
-      VALUE "CompanyName", "OBS"
-      VALUE "FileDescription", "OBS Studio"
+      VALUE "CompanyName", "CTD"
+      VALUE "FileDescription", "CTD OBS"
       VALUE "FileVersion", "${OBS_VERSION_CANONICAL}"
       VALUE "InternalName", "obs"
       VALUE "OriginalFilename", "obs"
-      VALUE "ProductName", "OBS Studio"
+      VALUE "ProductName", "CTD OBS"
       VALUE "ProductVersion", "${OBS_VERSION_CANONICAL}"
-      VALUE "Comments", "Free and open source software for video recording and live streaming"
+      VALUE "Comments", "Based on OBS Studio. Free and open source software under the GPL."
       VALUE "LegalCopyright", "${OBS_LEGAL_COPYRIGHT}"
     END
   END

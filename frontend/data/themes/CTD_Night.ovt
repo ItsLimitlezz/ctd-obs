@@ -1,0 +1,48 @@
+/* The CTD look (Night theme of the CineTech Digital design system), as a variant of OBS's Yami theme. */
+
+@OBSThemeMeta {
+    name: 'CTD Night';
+    id: 'com.cinetechdigital.ctd.Night';
+    extends: 'com.obsproject.Yami';
+    author: 'CTD';
+    dark: 'true';
+}
+
+@OBSThemeVars {
+    --grey1: #4A5A63;
+    --grey2: #3A4650;
+    --grey3: #2C3640;
+    --grey4: #222B34;
+    --grey5: #1A2127;
+    --grey6: #0B1821;
+    --grey7: #08111A;
+    --grey8: #04070C;
+
+    --blue1: #39E7FF;
+    --blue2: #2BC4DA;
+    --blue3: #0F5E6E;
+    --blue4: #0D4A57;
+    --blue5: #0D2B33;
+    --blue6: #0A1F25;
+
+    --pink1: #FF4DCD;
+    --pink2: #FF00B8;
+    --pink3: #C4008D;
+    --pink4: #9A006F;
+    --pink5: #700051;
+    --pink6: #4A0036;
+
+    --white1: #F2FBFF;
+    --white2: #DCE8EE;
+    --white3: #B9C6CE;
+    --white4: #A0B2BC;
+    --white5: #8BA3AF;
+
+    --border_radius: 2px;
+    --border_radius_small: 0px;
+    --border_radius_large: 4px;
+}
+
+QWidget {
+    font-family: 'Space Mono', Consolas, 'MS Shell Dlg', monospace;
+}

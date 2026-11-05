@@ -94,5 +94,7 @@
     <file>fonts/OpenSans-Regular.ttf</file>
     <file>fonts/OpenSans-Bold.ttf</file>
     <file>fonts/OpenSans-Italic.ttf</file>
+    <file>fonts/SpaceMono-Regular.ttf</file>
+    <file>fonts/SpaceMono-Bold.ttf</file>
   </qresource>
 </RCC>

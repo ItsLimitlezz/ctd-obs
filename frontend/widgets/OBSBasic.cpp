@@ -337,7 +337,7 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	installEventFilter(shortcutFilter);
 
 	stringstream name;
-	name << "OBS " << App()->GetVersionString();
+	name << "CTD OBS " << App()->GetVersionString();
 	blog(LOG_INFO, "%s", name.str().c_str());
 	blog(LOG_INFO, "---------------------------------");
 
@@ -1209,6 +1209,15 @@ void OBSBasic::OBSInit()
 #endif
 #endif
 
+	/* CTD OBS: these menu items go to the OBS Project's own services */
+	for (QAction *action : {ui->actionCheckForUpdates, ui->actionRepair, ui->actionUploadCurrentLog,
+				ui->actionUploadLastLog, ui->actionUploadLastCrashLog, ui->actionHelpPortal,
+				ui->actionWebsite, ui->actionDiscord}) {
+		if (action) {
+			action->setVisible(false);
+		}
+	}
+
 #ifdef __APPLE__
 	/* Remove OBS' Fullscreen Interface menu in favor of the one macOS adds by default */
 	delete ui->actionFullscreenInterface;
@@ -1982,7 +1991,7 @@ void OBSBasic::UpdateTitleBar()
 	const char *profile = config_get_string(App()->GetUserConfig(), "Basic", "Profile");
 	const char *sceneCollection = config_get_string(App()->GetUserConfig(), "Basic", "SceneCollection");
 
-	name << "OBS ";
+	name << "CTD OBS ";
 	if (previewProgramMode) {
 		name << "Studio ";
 	}

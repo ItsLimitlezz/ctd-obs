@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28...3.30)
 
-option(ENABLE_SERVICE_UPDATES "Checks for service updates" ON)
+option(ENABLE_SERVICE_UPDATES "Checks for service updates" OFF)
 
 set(
   RTMP_SERVICES_URL
