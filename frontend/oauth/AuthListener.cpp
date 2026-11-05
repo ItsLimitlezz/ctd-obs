@@ -17,7 +17,7 @@ static const QString serverResponseHeader = QStringLiteral("HTTP/1.0 200 OK\n"
 							   "Content-Type: text/html; charset=UTF-8\n"
 							   "Server: OBS Studio\n"
 							   "\n"
-							   "<html><head><title>OBS Studio"
+							   "<html><head><title>CTD OBS"
 							   "</title></head>");
 
 static const QString responseTemplate = "<center>"
