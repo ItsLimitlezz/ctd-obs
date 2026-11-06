@@ -17,6 +17,7 @@ Base: OBS Studio 33.0.1.
 | Streaming | Service lists offer only CTD Relay and Custom RTMP; new profiles use a custom server | `frontend/settings/OBSBasicSettings_Stream.cpp`, `frontend/wizards/AutoConfigStreamPage.cpp`, `frontend/wizards/AutoConfig.cpp`, `frontend/widgets/OBSBasic_Service.cpp`, `frontend/data/locale/en-US.ini` |
 | CTD plugin | Built in as a core module, from a submodule | `plugins/ctd-live-source`, `plugins/CMakeLists.txt`, `.gitmodules` |
 | Program name | `ctd-obs64.exe` instead of `obs64.exe` (updater, debugger settings, virtual camera self-check and file details follow); Windows packages are `ctd-obs-*-windows-x64.zip` | `frontend/CMakeLists.txt`, `frontend/cmake/windows/obs.rc.in`, `frontend/updater/updater.cpp`, `cmake/windows/cpackconfig.cmake`, `cmake/bundle/windows/ALL_BUILD.vcxproj.user.in`, `plugins/win-dshow/virtualcam-module/virtualcam-filter.cpp`, `.github/scripts/Package-Windows.ps1`, `.github/workflows/ctd-windows.yaml` |
+| Virtual camera | Own CLSID (`F65F7748-B099-4687-8DE4-834E7A944F0B`), device name "CTD OBS Virtual Camera", DLLs `ctd-obs-virtualcam-module32/64.dll`, shared-memory name `CTDOBSVirtualCamVideo` and resolution file `%APPDATA%\ctd-obs-virtualcam.txt`, so it can be installed and run beside stock OBS's virtual camera | `CMakePresets.json`, `cmake/windows/helpers.cmake`, `plugins/win-dshow/virtualcam-module/`, `plugins/win-dshow/virtualcam.c`, `shared/obs-shared-memory-queue/shared-memory-queue.c` |
 | Build | Windows x64 CI | `.github/workflows/ctd-windows.yaml` |
 
 ## Not changed yet

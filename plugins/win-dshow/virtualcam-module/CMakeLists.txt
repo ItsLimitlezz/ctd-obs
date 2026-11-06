@@ -149,6 +149,6 @@ target_add_resource(obs-virtualcam-module "${CMAKE_CURRENT_BINARY_DIR}/virtualca
 set_target_properties_obs(
   obs-virtualcam-module PROPERTIES
                         FOLDER plugins/win-dshow
-                        OUTPUT_NAME obs-${_OUTPUT_NAME}
+                        OUTPUT_NAME ctd-obs-${_OUTPUT_NAME}
                         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )

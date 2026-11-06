@@ -185,6 +185,12 @@ function(_target_install_obs target)
   set(multiValueArgs "")
   cmake_parse_arguments(PARSE_ARGV 0 _TIO "${options}" "${oneValueArgs}" "${multiValueArgs}")
 
+  # CTD OBS: the virtual camera DLLs are named ctd-obs-virtualcam-module32/64
+  set(file_base "${target}")
+  if(target STREQUAL obs-virtualcam-module)
+    set(file_base "ctd-obs-virtualcam-module")
+  endif()
+
   if(_TIO_x86)
     get_target_property(target_type ${target} TYPE)
     if(target_type STREQUAL EXECUTABLE)
@@ -196,12 +202,12 @@ function(_target_install_obs target)
     cmake_path(RELATIVE_PATH CMAKE_CURRENT_SOURCE_DIR BASE_DIRECTORY "${OBS_SOURCE_DIR}" OUTPUT_VARIABLE project_path)
 
     set(32bit_project_path "${OBS_SOURCE_DIR}/build_x86/${project_path}")
-    set(target_file "${32bit_project_path}/$<CONFIG>/${target}32.${suffix}")
-    set(target_pdb_file "${32bit_project_path}/$<CONFIG>/${target}32.pdb")
+    set(target_file "${32bit_project_path}/$<CONFIG>/${file_base}32.${suffix}")
+    set(target_pdb_file "${32bit_project_path}/$<CONFIG>/${file_base}32.pdb")
     set(comment "Copy ${target} (x86) to destination")
 
     install(
-      FILES "${32bit_project_path}/$<CONFIG>/${target}32.${suffix}"
+      FILES "${32bit_project_path}/$<CONFIG>/${file_base}32.${suffix}"
       DESTINATION "${_TIO_DESTINATION}"
       COMPONENT Runtime
       OPTIONAL
@@ -217,12 +223,12 @@ function(_target_install_obs target)
     cmake_path(RELATIVE_PATH CMAKE_CURRENT_SOURCE_DIR BASE_DIRECTORY "${OBS_SOURCE_DIR}" OUTPUT_VARIABLE project_path)
 
     set(64bit_project_path "${OBS_SOURCE_DIR}/build_x64/${project_path}")
-    set(target_file "${64bit_project_path}/$<CONFIG>/${target}64.${suffix}")
-    set(target_pdb_file "${64bit_project_path}/$<CONFIG>/${target}64.pdb")
+    set(target_file "${64bit_project_path}/$<CONFIG>/${file_base}64.${suffix}")
+    set(target_pdb_file "${64bit_project_path}/$<CONFIG>/${file_base}64.pdb")
     set(comment "Copy ${target} (x64) to destination")
 
     install(
-      FILES "${64bit_project_path}/$<CONFIG>/${target}64.${suffix}"
+      FILES "${64bit_project_path}/$<CONFIG>/${file_base}64.${suffix}"
       DESTINATION "${_TIO_DESTINATION}"
       COMPONENT Runtime
       OPTIONAL
