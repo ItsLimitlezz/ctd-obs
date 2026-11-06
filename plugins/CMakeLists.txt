@@ -51,6 +51,15 @@ add_core_module(
 add_core_module(aja-output-ui PLATFORMS WINDOWS MACOS LINUX WITH_MESSAGE)
 add_core_module(coreaudio-encoder PLATFORMS WINDOWS MACOS)
 add_core_module(ctd-live-source PLATFORMS WINDOWS)
+# CTD OBS: the vertical canvas (submodule ctd-vertical-canvas) builds the module 'vertical-canvas', the name the core
+# module loader looks for
+if(OS_WINDOWS)
+  if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ctd-vertical-canvas/CMakeLists.txt")
+    message(FATAL_ERROR "Required submodule 'ctd-vertical-canvas' not available.")
+  endif()
+  add_subdirectory(ctd-vertical-canvas)
+  target_enable(vertical-canvas)
+endif()
 add_core_module(
     decklink
     PLATFORMS WINDOWS MACOS LINUX
