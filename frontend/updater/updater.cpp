@@ -601,7 +601,7 @@ static inline DWORD WaitIfOBS(DWORD id, const wchar_t *expected)
 		name = path;
 	}
 
-	if (_wcsnicmp(name, expected, 5) == 0) {
+	if (_wcsnicmp(name, expected, wcslen(expected)) == 0) {
 		HANDLE hWait[2];
 		hWait[0] = proc;
 		hWait[1] = cancelRequested;
@@ -632,7 +632,7 @@ static bool WaitForOBS()
 	for (DWORD i = 0; i < count; i++) {
 		DWORD id = proc_ids[i];
 		if (id != 0) {
-			switch (WaitIfOBS(id, L"obs64")) {
+			switch (WaitIfOBS(id, L"ctd-obs64")) {
 			case WAITIFOBS_SUCCESS:
 				return true;
 			case WAITIFOBS_WRONG_PROCESS:
@@ -1884,7 +1884,7 @@ static void LaunchOBS(LPWSTR lpCmdLine)
 	SetCurrentDirectory(obsPath);
 	StringCbCopy(newCwd, sizeof(newCwd), obsPath);
 
-	StringCbCat(obsPath, sizeof(obsPath), L"\\obs64.exe");
+	StringCbCat(obsPath, sizeof(obsPath), L"\\ctd-obs64.exe");
 
 	if (!FileExists(obsPath)) {
 		/* TODO: give user a message maybe? */

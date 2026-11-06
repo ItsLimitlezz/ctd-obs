@@ -16,11 +16,11 @@ Base: OBS Studio 33.0.1.
 | Look | CTD Night theme as the default, Space Mono font, CTD icons | `frontend/data/themes/CTD_Night.ovt`, `frontend/cmake/templates/ui-config.h.in`, `frontend/obs-main.cpp`, `frontend/forms/obs.qrc`, `frontend/forms/fonts/`, `frontend/forms/images/`, `frontend/cmake/windows/obs-studio.ico` |
 | Streaming | Service lists offer only CTD Relay and Custom RTMP; new profiles use a custom server | `frontend/settings/OBSBasicSettings_Stream.cpp`, `frontend/wizards/AutoConfigStreamPage.cpp`, `frontend/wizards/AutoConfig.cpp`, `frontend/widgets/OBSBasic_Service.cpp`, `frontend/data/locale/en-US.ini` |
 | CTD plugin | Built in as a core module, from a submodule | `plugins/ctd-live-source`, `plugins/CMakeLists.txt`, `.gitmodules` |
+| Program name | `ctd-obs64.exe` instead of `obs64.exe` (updater, debugger settings, virtual camera self-check and file details follow); Windows packages are `ctd-obs-*-windows-x64.zip` | `frontend/CMakeLists.txt`, `frontend/cmake/windows/obs.rc.in`, `frontend/updater/updater.cpp`, `cmake/windows/cpackconfig.cmake`, `cmake/bundle/windows/ALL_BUILD.vcxproj.user.in`, `plugins/win-dshow/virtualcam-module/virtualcam-filter.cpp`, `.github/scripts/Package-Windows.ps1`, `.github/workflows/ctd-windows.yaml` |
 | Build | Windows x64 CI | `.github/workflows/ctd-windows.yaml` |
 
 ## Not changed yet
 
-- The program is still `obs64.exe`, and packages are still named `obs-studio-*`.
 - Other languages and many English strings still say OBS.
 - macOS and Linux paths and branding.
 - The virtual camera registers the same Windows component as stock OBS, so it may conflict when both are installed.
