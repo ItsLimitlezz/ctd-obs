@@ -90,7 +90,7 @@ void PluginManager::loadAllPlugins(bool usePortableMode)
 	if (!coreModuleLoadSuccess) {
 		loadState_ = State::Failure;
 		//TODO: Replace with structured exception type - https://github.com/obsproject/obs-studio/issues/13394
-		throw "Failed to load core OBS modules. OBS cannot run without these modules. Please try reinstalling OBS.";
+		throw "Failed to load core CTD OBS modules. CTD OBS cannot run without these modules. Please try reinstalling CTD OBS.";
 	} else {
 		if (loadMode_ == Mode::Full) {
 			blog(LOG_INFO, "---------------------------------");
