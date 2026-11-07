@@ -11,3 +11,7 @@
 	path = plugins/ctd-live-source
 	url = https://github.com/ItsLimitlezz/ctd-obs-plugin.git
 	branch = ctd-obs-in-tree
+[submodule "plugins/ctd-vertical-canvas"]
+	path = plugins/ctd-vertical-canvas
+	url = https://github.com/ItsLimitlezz/ctd-vertical-canvas.git
+	branch = ctd-obs-in-tree
