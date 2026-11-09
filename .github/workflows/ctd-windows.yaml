@@ -40,3 +40,15 @@ jobs:
         with:
           name: ctd-obs-windows-x64-${{ github.sha }}
           path: ${{ github.workspace }}/build_x64/ctd-obs-*-windows-x64.zip
+
+      # SIGNING HOOK: code signing is not set up yet. When a certificate is available, set the
+      # CTD_SIGN_CMD environment variable on the Package step (from repository secrets, never
+      # committed) to a command that signs "%1"; Package-Windows.ps1 then signs the installer and
+      # its uninstaller. See the SIGNING HOOK in .github/scripts/Package-Windows.ps1.
+
+      - name: Upload installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ctd-obs-setup-windows-x64-${{ github.sha }}
+          path: ${{ github.workspace }}/build_x64/CTD-OBS-Setup-*-x64.exe
+          if-no-files-found: error

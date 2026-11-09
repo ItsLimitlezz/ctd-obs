@@ -21,6 +21,7 @@ Base: OBS Studio 33.0.1.
 | Virtual camera | Own CLSID (`F65F7748-B099-4687-8DE4-834E7A944F0B`), device name "CTD OBS Virtual Camera", DLLs `ctd-obs-virtualcam-module32/64.dll`, shared-memory name `CTDOBSVirtualCamVideo` and resolution file `%APPDATA%\ctd-obs-virtualcam.txt`, so it can be installed and run beside stock OBS's virtual camera | `CMakePresets.json`, `cmake/windows/helpers.cmake`, `plugins/win-dshow/virtualcam-module/`, `plugins/win-dshow/virtualcam.c`, `shared/obs-shared-memory-queue/shared-memory-queue.c` |
 | Strings | English UI says CTD OBS where it means the app (credits, licence and obs-websocket untouched) | `frontend/data/locale/en-US.ini`, `frontend/obs-main.cpp`, `frontend/widgets/OBSBasic_SysTray.cpp`, `frontend/oauth/AuthListener.cpp`, `frontend/plugin-manager/PluginManager.cpp` |
 | Build | Windows x64 CI | `.github/workflows/ctd-windows.yaml` |
+| Installer | NSIS setup `CTD-OBS-Setup-<version>-x64.exe` built next to the zip: installs per machine to `C:\Program Files\CTD OBS`, Start menu and optional desktop shortcut, registers the CTD OBS virtual camera, "CTD OBS" Add/Remove Programs entry (publisher CineTech Digital), VC++ runtime when missing, own registry keys only (side by side with OBS Studio); uninstall keeps `%APPDATA%\ctd-obs` unless "Remove settings" is ticked; code signing hook left for later | `cmake/windows/installer/ctd-obs.nsi`, `.github/scripts/Package-Windows.ps1`, `.github/workflows/ctd-windows.yaml` |
 
 ## Not changed yet
 
