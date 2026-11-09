@@ -99,7 +99,8 @@ function Find-MakeNsis {
     }
 
     Log-Information 'NSIS not found, installing it with Chocolatey'
-    Invoke-External choco install nsis -y --no-progress
+    # Out-Host: keep choco output out of this function's return value
+    Invoke-External choco install nsis -y --no-progress | Out-Host
     foreach ( $Candidate in $Candidates ) {
         if ( Test-Path $Candidate ) { return $Candidate }
     }
