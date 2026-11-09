@@ -44,6 +44,17 @@ static void ApplyEncoderDefaults(OBSData &settings, const obs_encoder_t *encoder
 	settings = std::move(dataRet);
 }
 
+/* CTD OBS: CTD Relay and the platforms it sends to want a keyframe every 2 s.
+ * Only fills in a missing value; a keyframe interval the user set (even 0 = auto) is kept.
+ * Every encoder OBS ships (x264, NVENC, QSV, AMF, ...) calls the property keyint_sec. */
+static void ApplyCTDKeyframeDefault(OBSData &settings)
+{
+	if (!settings)
+		settings = obs_data_create();
+	if (!obs_data_has_user_value(settings, "keyint_sec"))
+		obs_data_set_int(settings, "keyint_sec", 2);
+}
+
 #define ADV_ARCHIVE_NAME "adv_archive_audio"
 
 #ifdef __APPLE__
@@ -76,6 +87,7 @@ AdvancedOutput::AdvancedOutput(OBSBasic *main_) : BasicOutputHandler(main_)
 	useStreamAudioEncoder = astrcmpi(recAudioEncoder, "none") == 0;
 
 	OBSData streamEncSettings = GetDataFromJsonFile("streamEncoder.json");
+	ApplyCTDKeyframeDefault(streamEncSettings);
 	OBSData recordEncSettings = GetDataFromJsonFile("recordEncoder.json");
 
 	if (ffmpegOutput) {
@@ -206,6 +218,7 @@ void AdvancedOutput::UpdateStreamSettings()
 	const char *streamEncoder = config_get_string(main->Config(), "AdvOut", "Encoder");
 
 	OBSData settings = GetDataFromJsonFile("streamEncoder.json");
+	ApplyCTDKeyframeDefault(settings);
 	ApplyEncoderDefaults(settings, videoStreaming);
 
 	if (applyServiceSettings) {
