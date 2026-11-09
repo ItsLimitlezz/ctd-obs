@@ -327,6 +327,8 @@ void SimpleOutput::Update()
 
 	obs_data_set_string(videoSettings, "rate_control", "CBR");
 	obs_data_set_int(videoSettings, "bitrate", videoBitrate);
+	/* CTD OBS: CTD Relay and the platforms it sends to want a keyframe every 2 s */
+	obs_data_set_int(videoSettings, "keyint_sec", 2);
 
 	if (advanced) {
 		obs_data_set_string(videoSettings, "x264opts", custom);
