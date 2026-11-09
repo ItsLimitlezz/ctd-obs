@@ -278,6 +278,13 @@ void OBSBasic::ChangeProfile()
 
 	const OBSProfile &selectedProfile = foundProfile.value();
 
+	/* CTD: no profile switch while any output (including plugin outputs) is active. */
+	if (CtdAnyOutputActive()) {
+		action->setChecked(false);
+		RefreshProfiles();
+		return;
+	}
+
 	OnEvent(OBS_FRONTEND_EVENT_PROFILE_CHANGING);
 
 	ActivateProfile(selectedProfile, true);
@@ -665,7 +672,7 @@ void OBSBasic::on_actionExportProfile_triggered()
 
 // MARK: - Profile Management Helper Functions
 
-void OBSBasic::ActivateProfile(const OBSProfile &profile, bool reset)
+void OBSBasic::ActivateProfile(const OBSProfile &profile, bool reset, std::vector<std::string> *ctdRestartRequirements)
 {
 	ConfigFile config;
 	if (config.Open(profile.profileFile.u8string().c_str(), CONFIG_OPEN_ALWAYS) != CONFIG_SUCCESS) {
@@ -725,6 +732,12 @@ void OBSBasic::ActivateProfile(const OBSProfile &profile, bool reset)
 #endif
 
 	OnEvent(OBS_FRONTEND_EVENT_PROFILE_CHANGED);
+
+	/* CTD: Show Profiles applies profiles without a restart prompt and reports the requirements instead. */
+	if (ctdRestartRequirements) {
+		*ctdRestartRequirements = restartRequirements;
+		return;
+	}
 
 	if (!restartRequirements.empty()) {
 		std::string requirements = std::accumulate(

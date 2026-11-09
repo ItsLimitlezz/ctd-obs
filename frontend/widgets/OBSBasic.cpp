@@ -1258,6 +1258,8 @@ void OBSBasic::OBSInit()
 
 void OBSBasic::OnFirstLoad()
 {
+	CtdRegisterShowProcs();
+
 	OnEvent(OBS_FRONTEND_EVENT_FINISHED_LOADING);
 
 #ifdef WHATSNEW_ENABLED

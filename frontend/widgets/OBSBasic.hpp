@@ -918,7 +918,8 @@ private:
 
 	void RefreshProfiles(bool refreshCache = false);
 
-	void ActivateProfile(const OBSProfile &profile, bool reset = false);
+	void ActivateProfile(const OBSProfile &profile, bool reset = false,
+			     std::vector<std::string> *ctdRestartRequirements = nullptr);
 	void UpdateProfileEncoders();
 	std::vector<std::string> GetRestartRequirements(const ConfigFile &config) const;
 	void ResetProfileData();
@@ -1133,6 +1134,21 @@ private slots:
 	void on_actionImportSceneCollection_triggered();
 	void on_actionExportSceneCollection_triggered();
 	void on_actionRemigrateSceneCollection_triggered();
+
+	/* -------------------------------------
+	 * MARK: - OBSBasic_CtdShow (CTD Show Profiles)
+	 * -------------------------------------
+	 */
+private:
+	void CtdRegisterShowProcs();
+	void CtdUpdateSwitchMenus();
+
+public:
+	/* UI thread only. The global procs ctd_show_apply / ctd_show_refresh marshal to it. */
+	bool CtdShowApply(const std::string &collectionPath, const std::string &profilePath, std::string &error,
+			  bool &restartRequired);
+	bool CtdShowRefresh(std::string &error);
+	static bool CtdAnyOutputActive();
 
 public:
 	inline bool SavingDisabled() const { return disableSaving; }
