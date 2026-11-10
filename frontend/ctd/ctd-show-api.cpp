@@ -379,7 +379,32 @@ bool OBSBasic::CtdShowRefresh(std::string &error)
 	}
 
 	RefreshProfiles(true);
-	RefreshSceneCollections(true);
+
+	/* The rescan only sees collections that are on disk and builds new entries for them. On a fresh
+	 * config the active collection ("Untitled") exists only in memory until OBS's first deferred
+	 * save, and the CTD plugin probes for this proc during FINISHED_LOADING, before that save runs.
+	 * Dropping the entry would make every later save fail ("Scene collection not found in collection
+	 * list"), so the active collection stays listed. Its in-memory state (coordinate mode, migration
+	 * resolution, which Save() writes) is kept too. */
+	std::optional<OBS::SceneCollection> active;
+	try {
+		active = GetCurrentSceneCollection();
+	} catch (const std::invalid_argument &) {
+	}
+
+	RefreshSceneCollectionCache();
+	if (active) {
+		auto found = collections.find(active->getName());
+		if (found == collections.end()) {
+			blog(LOG_INFO, "[ctd-show] Keeping unsaved active scene collection '%s' (%s) in the list",
+			     active->getName().c_str(), active->getFileName().c_str());
+			collections.try_emplace(active->getName(), std::move(*active));
+		} else if (found->second.getFilePath() == active->getFilePath()) {
+			found->second = std::move(*active);
+		}
+	}
+	RefreshSceneCollections();
+
 	OnEvent(OBS_FRONTEND_EVENT_PROFILE_LIST_CHANGED);
 	OnEvent(OBS_FRONTEND_EVENT_SCENE_COLLECTION_LIST_CHANGED);
 	return true;
