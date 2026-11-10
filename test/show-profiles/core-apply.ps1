@@ -27,6 +27,12 @@
   Leaves the collection and profile that were active before. Removes everything it created.
   Makes no network calls except to the local obs-websocket.
 
+  Runs on Windows PowerShell 5.1 and PowerShell 7. For a portable copy, pass -ConfigRoot
+  <portable folder>\config\ctd-obs.
+
+.EXAMPLE
+  powershell -ExecutionPolicy Bypass -File test\show-profiles\core-apply.ps1 -Password (Read-Host -AsSecureString) -TestGuard
+
 .EXAMPLE
   pwsh -File test\show-profiles\core-apply.ps1 -Password (Read-Host -AsSecureString) -TestGuard
 #>
@@ -66,9 +72,11 @@ function Receive-Json {
     [Text.Encoding]::UTF8.GetString($stream.ToArray()) | ConvertFrom-Json
 }
 
+# Windows PowerShell 5.1 returns a VoidTaskResult from GetResult() on a plain Task; drop it so it
+# doesn't end up in the caller's output.
 function Send-Json($obj) {
     $bytes = [Text.Encoding]::UTF8.GetBytes(($obj | ConvertTo-Json -Depth 20 -Compress))
-    $ws.SendAsync([ArraySegment[byte]]::new($bytes), 'Text', $true, $ct).GetAwaiter().GetResult()
+    $null = $ws.SendAsync([ArraySegment[byte]]::new($bytes), 'Text', $true, $ct).GetAwaiter().GetResult()
 }
 
 function Get-Sha256B64([string]$s) {
@@ -77,7 +85,7 @@ function Get-Sha256B64([string]$s) {
 }
 
 function Connect-Obs {
-    $ws.ConnectAsync([Uri]"ws://$($WsHost):$Port", $ct).GetAwaiter().GetResult()
+    $null = $ws.ConnectAsync([Uri]"ws://$($WsHost):$Port", $ct).GetAwaiter().GetResult()
     $hello = Receive-Json
     # eventSubscriptions 2 = Config events (CurrentSceneCollectionChanged, CurrentProfileChanged, ...)
     $identify = @{ op = 1; d = @{ rpcVersion = 1; eventSubscriptions = 2 } }
@@ -93,7 +101,9 @@ function Connect-Obs {
     if ($identified.op -ne 2) { throw "obs-websocket identify failed" }
 }
 
-# Returns the response data; throws on failure unless -AllowFail, which returns $null instead.
+# Returns the response data and throws on failure. With -AllowFail it never throws and returns
+# @{ requestStatus = @{ result; code; comment }; responseData } instead, so a caller can tell a refusal
+# (requestStatus.result -eq $false, plus the code) from a success that has no response data.
 function Invoke-Obs([string]$type, $data = @{}, [switch]$AllowFail) {
     $id = [guid]::NewGuid().ToString()
     Send-Json @{ op = 6; d = @{ requestType = $type; requestId = $id; requestData = $data } }
@@ -101,14 +111,25 @@ function Invoke-Obs([string]$type, $data = @{}, [switch]$AllowFail) {
         $msg = Receive-Json
         if ($msg.op -eq 5) { $script:events.Add($msg.d); continue }
         if ($msg.op -eq 7 -and $msg.d.requestId -eq $id) {
-            if (-not $msg.d.requestStatus.result) {
-                if ($AllowFail) { return $null }
-                throw "$type failed: $($msg.d.requestStatus.code) $($msg.d.requestStatus.comment)"
+            $status = $msg.d.requestStatus
+            if ($AllowFail) {
+                return [pscustomobject]@{
+                    requestStatus = [pscustomobject]@{
+                        result  = [bool]$status.result
+                        code    = [int]$status.code
+                        comment = [string]$status.comment
+                    }
+                    responseData  = $msg.d.responseData
+                }
             }
+            if (-not $status.result) { throw "$type failed: $($status.code) $($status.comment)" }
             return $msg.d.responseData
         }
     }
 }
+
+# obs-websocket RequestStatus codes used below
+$ResourceCreationFailed = 700
 
 function Invoke-Ctd([string]$request, $data = @{}) {
     $r = Invoke-Obs "CallVendorRequest" @{ vendorName = "ctd-obs"; requestType = $request; requestData = $data }
@@ -126,7 +147,8 @@ function Get-ActiveNames {
     }
 }
 
-function Wait-Event([string]$type, [int]$seconds = 5) {
+# Not called Wait-Event: that is a built-in cmdlet name.
+function Wait-ObsEvent([string]$type, [int]$seconds = 5) {
     $deadline = (Get-Date).AddSeconds($seconds)
     while ((Get-Date) -lt $deadline) {
         if ($script:events | Where-Object { $_.eventType -eq $type }) { return $true }
@@ -138,19 +160,24 @@ function Wait-Event([string]$type, [int]$seconds = 5) {
 
 # ---------------------------------------------------------------- files
 
+# [IO.File] reads UTF-8 without a BOM correctly on both PowerShell versions; Windows PowerShell 5.1's
+# Get-Content would read OBS's files in the ANSI code page and mangle non-ASCII names.
+function Read-Text([string]$path) { [IO.File]::ReadAllText($path, $utf8) }
+function Read-Json([string]$path) { Read-Text $path | ConvertFrom-Json }
+
 $scenesDir = Join-Path $ConfigRoot "basic\scenes"
 $profilesDir = Join-Path $ConfigRoot "basic\profiles"
 
 function Find-CollectionFile([string]$name) {
     Get-ChildItem $scenesDir -Filter *.json | Where-Object {
-        (Get-Content $_.FullName -Raw | ConvertFrom-Json).name -eq $name
+        (Read-Json $_.FullName).name -eq $name
     } | Select-Object -First 1
 }
 
 function Find-ProfileDir([string]$name) {
     Get-ChildItem $profilesDir -Directory | Where-Object {
         $ini = Join-Path $_.FullName "basic.ini"
-        (Test-Path $ini) -and ((Get-Content $ini) -match "^Name=$([regex]::Escape($name))$")
+        (Test-Path $ini) -and ([IO.File]::ReadAllLines($ini, $utf8) -match "^Name=$([regex]::Escape($name))$")
     } | Select-Object -First 1
 }
 
@@ -161,7 +188,7 @@ function Set-IniName([string]$iniPath, [string]$name) {
 }
 
 function Set-CollectionName([string]$jsonPath, [string]$name) {
-    $json = Get-Content $jsonPath -Raw | ConvertFrom-Json
+    $json = Read-Json $jsonPath
     $json.name = $name
     [IO.File]::WriteAllText($jsonPath, ($json | ConvertTo-Json -Depth 100 -Compress), $utf8)
 }
@@ -187,7 +214,7 @@ New-Item -ItemType Directory -Force $stageDir | Out-Null
 # Snapshot of the active collection and profile as they are now (used to restore B).
 $stagedCollection = Join-Path $stageDir $activeFile.Name
 Copy-Item $activeFile.FullName $stagedCollection
-$stagedSceneCount = @((Get-Content $stagedCollection -Raw | ConvertFrom-Json).scene_order).Count
+$stagedSceneCount = @((Read-Json $stagedCollection).scene_order).Count
 $stagedProfileOrig = Join-Path $stageDir "profile-orig"
 Copy-Item $activeProfileDir.FullName $stagedProfileOrig -Recurse
 
@@ -206,13 +233,13 @@ try {
     Check $r.success "show_apply (active collection) succeeded $(if (-not $r.success) { ": $($r.error)" })"
     Check (-not $r.restart_required) "restart_required is false with no profile"
     Check ((Get-ActiveNames).Collection -eq $orig.Collection) "active collection is still '$($orig.Collection)'"
-    Check (Wait-Event "CurrentSceneCollectionChanged") "obs-websocket saw CurrentSceneCollectionChanged"
+    Check (Wait-ObsEvent "CurrentSceneCollectionChanged") "obs-websocket saw CurrentSceneCollectionChanged"
 
     $sceneNames = @((Invoke-Obs "GetSceneList").scenes | ForEach-Object { $_.sceneName })
     Check (-not ($sceneNames -contains $probe)) "probe scene gone from OBS (the staged file was loaded)"
     Check ($sceneNames.Count -eq $stagedSceneCount) "scene count matches the staged file ($stagedSceneCount)"
     Start-Sleep -Seconds 2   # any save after loading must write the staged state, not the old one
-    Check (-not ((Get-Content $activeFile.FullName -Raw) -match [regex]::Escape($probe))) `
+    Check (-not ((Read-Text $activeFile.FullName) -match [regex]::Escape($probe))) `
         "probe scene not in the collection file on disk"
 
     # ------------------------------------------------------------ B. re-apply the active profile
@@ -227,10 +254,10 @@ try {
     Check $r.success "show_apply (active profile) succeeded $(if (-not $r.success) { ": $($r.error)" })"
     Check (-not $r.restart_required) "restart_required is false (same audio settings)"
     Check ((Get-ActiveNames).Profile -eq $orig.Profile) "active profile is still '$($orig.Profile)'"
-    Check (Wait-Event "CurrentProfileChanged") "obs-websocket saw CurrentProfileChanged"
+    Check (Wait-ObsEvent "CurrentProfileChanged") "obs-websocket saw CurrentProfileChanged"
     $p = Invoke-Obs "GetProfileParameter" @{ parameterCategory = "CtdCoreTest"; parameterName = "Marker" }
     Check ($p.parameterValue -eq $marker) "new basic.ini is in use (marker = '$($p.parameterValue)')"
-    Check ((Get-Content (Join-Path $activeProfileDir.FullName "basic.ini") -Raw) -match [regex]::Escape($marker)) `
+    Check ((Read-Text (Join-Path $activeProfileDir.FullName "basic.ini")) -match [regex]::Escape($marker)) `
         "new basic.ini is on disk"
 
     $r = Show-Apply -Prof $stagedProfileOrig
@@ -255,7 +282,7 @@ try {
     Check ($now.Profile -eq $testProfileName) "active profile is '$testProfileName' (got '$($now.Profile)')"
     Check ([bool](Find-CollectionFile $testCollectionName)) "new collection file is in basic/scenes"
     Check ([bool](Find-ProfileDir $testProfileName)) "new profile folder is in basic/profiles"
-    Check (Wait-Event "CurrentSceneCollectionChanged") "obs-websocket saw CurrentSceneCollectionChanged"
+    Check (Wait-ObsEvent "CurrentSceneCollectionChanged") "obs-websocket saw CurrentSceneCollectionChanged"
 
     Invoke-Obs "SetCurrentProfile" @{ profileName = $orig.Profile } | Out-Null
     Invoke-Obs "SetCurrentSceneCollection" @{ sceneCollectionName = $orig.Collection } | Out-Null
@@ -292,6 +319,7 @@ try {
     Check $r.success "show_refresh succeeded $(if (-not $r.success) { ": $($r.error)" })"
     $list = @((Invoke-Obs "GetSceneCollectionList").sceneCollections)
     Check (-not ($list -contains $testCollectionName)) "removed collection is gone from the list"
+    Check ($list -contains $orig.Collection) "active collection is still in the list"
 
     # ------------------------------------------------------------ F. guard
     $guardOutputs = @()
@@ -314,7 +342,11 @@ try {
             Check (-not $r.success -and $r.error -eq "outputs active") "show_apply refused: '$($r.error)'"
 
             $created = Invoke-Obs "CreateSceneCollection" @{ sceneCollectionName = "CTD Guard Create $tag" } -AllowFail
-            Check ($null -eq $created) "CreateSceneCollection refused"
+            $st = $created.requestStatus
+            Check ($st.result -eq $false -and $st.code -eq $ResourceCreationFailed) `
+                "CreateSceneCollection refused (result $($st.result), code $($st.code)$(if ($st.comment) { ", $($st.comment)" }))"
+            $list = @((Invoke-Obs "GetSceneCollectionList").sceneCollections)
+            Check (-not ($list -contains "CTD Guard Create $tag")) "refused collection is not in the list"
 
             $others = @((Invoke-Obs "GetSceneCollectionList").sceneCollections | Where-Object { $_ -ne $orig.Collection })
             if ($others) {
