@@ -288,6 +288,11 @@ void OBSBasic::RemoveSceneCollection(SceneCollection collection)
 
 bool OBSBasic::CreateNewSceneCollection(const QString &name)
 {
+	/* CTD: no switching while any output is active. */
+	if (CtdSwitchBlocked()) {
+		return false;
+	}
+
 	try {
 		SetupNewSceneCollection(name.toStdString());
 		return true;
@@ -302,6 +307,11 @@ bool OBSBasic::CreateNewSceneCollection(const QString &name)
 
 bool OBSBasic::CreateDuplicateSceneCollection(const QString &name)
 {
+	/* CTD: no switching while any output is active. */
+	if (CtdSwitchBlocked()) {
+		return false;
+	}
+
 	try {
 		SetupDuplicateSceneCollection(name.toStdString());
 		return true;
@@ -362,6 +372,13 @@ void OBSBasic::ChangeSceneCollection()
 	}
 
 	SceneCollection &selectedCollection = foundCollection.value();
+
+	/* CTD: no scene collection switch while any output is active (also covers the frontend API and
+	 * obs-websocket, which trigger this menu action). */
+	if (CtdSwitchBlocked()) {
+		action->setChecked(false);
+		return;
+	}
 
 	OnEvent(OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGING);
 
@@ -507,6 +524,11 @@ std::optional<SceneCollection> OBSBasic::GetSceneCollectionByFileName(const std:
 
 void OBSBasic::on_actionNewSceneCollection_triggered()
 {
+	/* CTD: no switching while any output is active. */
+	if (CtdSwitchBlocked()) {
+		return;
+	}
+
 	const OBSPromptCallback sceneCollectionCallback = [this](const OBSPromptResult &result) {
 		if (GetSceneCollectionByName(result.promptValue)) {
 			return false;
@@ -535,6 +557,11 @@ void OBSBasic::on_actionNewSceneCollection_triggered()
 
 void OBSBasic::on_actionDupSceneCollection_triggered()
 {
+	/* CTD: no switching while any output is active. */
+	if (CtdSwitchBlocked()) {
+		return;
+	}
+
 	const OBSPromptCallback sceneCollectionCallback = [this](const OBSPromptResult &result) {
 		if (GetSceneCollectionByName(result.promptValue)) {
 			return false;
@@ -563,6 +590,11 @@ void OBSBasic::on_actionDupSceneCollection_triggered()
 
 void OBSBasic::on_actionRenameSceneCollection_triggered()
 {
+	/* CTD: no switching while any output is active. */
+	if (CtdSwitchBlocked()) {
+		return;
+	}
+
 	const SceneCollection &currentCollection = GetCurrentSceneCollection();
 
 	const OBSPromptCallback sceneCollectionCallback = [this](const OBSPromptResult &result) {
@@ -593,6 +625,11 @@ void OBSBasic::on_actionRenameSceneCollection_triggered()
 
 void OBSBasic::on_actionRemoveSceneCollection_triggered(bool skipConfirmation)
 {
+	/* CTD: no switching while any output is active. */
+	if (CtdSwitchBlocked()) {
+		return;
+	}
+
 	if (collections.size() < 2) {
 		return;
 	}
@@ -634,6 +671,11 @@ void OBSBasic::on_actionRemoveSceneCollection_triggered(bool skipConfirmation)
 
 void OBSBasic::on_actionImportSceneCollection_triggered()
 {
+	/* CTD: no switching while any output is active. */
+	if (CtdSwitchBlocked()) {
+		return;
+	}
+
 	OBSImporter imp(this);
 	imp.exec();
 

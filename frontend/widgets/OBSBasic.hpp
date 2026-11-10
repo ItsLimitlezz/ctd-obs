@@ -918,7 +918,8 @@ private:
 
 	void RefreshProfiles(bool refreshCache = false);
 
-	void ActivateProfile(const OBSProfile &profile, bool reset = false);
+	void ActivateProfile(const OBSProfile &profile, bool reset = false,
+			     std::vector<std::string> *ctdRestartRequirements = nullptr);
 	void UpdateProfileEncoders();
 	std::vector<std::string> GetRestartRequirements(const ConfigFile &config) const;
 	void ResetProfileData();
@@ -1685,6 +1686,26 @@ private:
 
 	void BroadcastButtonClicked();
 	void SetBroadcastFlowEnabled(bool enabled);
+
+	/* -------------------------------------
+	 * MARK: - CTD Show Profiles (frontend/ctd/ctd-show-api.cpp)
+	 * -------------------------------------
+	 */
+private:
+	bool ctdShowReady = false;
+	bool ctdShowApplying = false;
+
+	void CtdShowRegisterProcs();
+	void CtdShowFinishLoading();
+	void CtdUpdateSwitchMenus(bool menuOpen);
+	bool CtdSwitchBlocked();
+
+public:
+	/* UI thread only; the procs ctd_show_apply / ctd_show_refresh marshal to it. */
+	bool CtdShowApply(const std::string &collectionPath, const std::string &profilePath, std::string &error,
+			  bool &restartRequired);
+	bool CtdShowRefresh(std::string &error);
+	static bool CtdAnyOutputActive();
 
 public:
 #ifdef YOUTUBE_ENABLED

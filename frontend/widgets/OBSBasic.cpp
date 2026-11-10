@@ -926,6 +926,8 @@ void OBSBasic::OBSInit()
 	// but after initializing global settings, to ensure legacy code gets valid path information.
 	RefreshSceneCollections(true);
 
+	CtdShowRegisterProcs();
+
 	App()->loadAppModules();
 
 #ifdef BROWSER_AVAILABLE
@@ -1258,6 +1260,8 @@ void OBSBasic::OBSInit()
 
 void OBSBasic::OnFirstLoad()
 {
+	CtdShowFinishLoading();
+
 	OnEvent(OBS_FRONTEND_EVENT_FINISHED_LOADING);
 
 #ifdef WHATSNEW_ENABLED

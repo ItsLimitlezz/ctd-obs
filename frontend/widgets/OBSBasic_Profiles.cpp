@@ -199,6 +199,11 @@ void OBSBasic::RemoveProfile(OBSProfile profile)
 
 bool OBSBasic::CreateNewProfile(const QString &name)
 {
+	/* CTD: no switching while any output is active. */
+	if (CtdSwitchBlocked()) {
+		return false;
+	}
+
 	try {
 		SetupNewProfile(name.toStdString());
 		return true;
@@ -213,6 +218,11 @@ bool OBSBasic::CreateNewProfile(const QString &name)
 
 bool OBSBasic::CreateDuplicateProfile(const QString &name)
 {
+	/* CTD: no switching while any output is active. */
+	if (CtdSwitchBlocked()) {
+		return false;
+	}
+
 	try {
 		SetupDuplicateProfile(name.toStdString());
 		return true;
@@ -277,6 +287,12 @@ void OBSBasic::ChangeProfile()
 	}
 
 	const OBSProfile &selectedProfile = foundProfile.value();
+
+	/* CTD: no profile switch while any output is active (also covers the frontend API and obs-websocket). */
+	if (CtdSwitchBlocked()) {
+		action->setChecked(false);
+		return;
+	}
 
 	OnEvent(OBS_FRONTEND_EVENT_PROFILE_CHANGING);
 
@@ -420,6 +436,11 @@ std::optional<OBSProfile> OBSBasic::GetProfileByDirectoryName(const std::string 
 
 void OBSBasic::on_actionNewProfile_triggered()
 {
+	/* CTD: no switching while any output is active. */
+	if (CtdSwitchBlocked()) {
+		return;
+	}
+
 	bool useProfileWizard = config_get_bool(App()->GetUserConfig(), "Basic", "ConfigOnNewProfile");
 
 	const OBSPromptCallback profilePromptCallback = [this](const OBSPromptResult &result) {
@@ -450,6 +471,11 @@ void OBSBasic::on_actionNewProfile_triggered()
 
 void OBSBasic::on_actionDupProfile_triggered()
 {
+	/* CTD: no switching while any output is active. */
+	if (CtdSwitchBlocked()) {
+		return;
+	}
+
 	const OBSPromptCallback profilePromptCallback = [this](const OBSPromptResult &result) {
 		if (GetProfileByName(result.promptValue)) {
 			return false;
@@ -477,6 +503,11 @@ void OBSBasic::on_actionDupProfile_triggered()
 
 void OBSBasic::on_actionRenameProfile_triggered()
 {
+	/* CTD: no switching while any output is active. */
+	if (CtdSwitchBlocked()) {
+		return;
+	}
+
 	const std::string currentProfileName = config_get_string(App()->GetUserConfig(), "Basic", "Profile");
 
 	const OBSPromptCallback profilePromptCallback = [this](const OBSPromptResult &result) {
@@ -506,6 +537,11 @@ void OBSBasic::on_actionRenameProfile_triggered()
 
 void OBSBasic::on_actionRemoveProfile_triggered(bool skipConfirmation)
 {
+	/* CTD: no switching while any output is active. */
+	if (CtdSwitchBlocked()) {
+		return;
+	}
+
 	if (profiles.size() < 2) {
 		return;
 	}
@@ -665,7 +701,7 @@ void OBSBasic::on_actionExportProfile_triggered()
 
 // MARK: - Profile Management Helper Functions
 
-void OBSBasic::ActivateProfile(const OBSProfile &profile, bool reset)
+void OBSBasic::ActivateProfile(const OBSProfile &profile, bool reset, std::vector<std::string> *ctdRestartRequirements)
 {
 	ConfigFile config;
 	if (config.Open(profile.profileFile.u8string().c_str(), CONFIG_OPEN_ALWAYS) != CONFIG_SUCCESS) {
@@ -725,6 +761,12 @@ void OBSBasic::ActivateProfile(const OBSProfile &profile, bool reset)
 #endif
 
 	OnEvent(OBS_FRONTEND_EVENT_PROFILE_CHANGED);
+
+	/* CTD: Show Profiles applies a profile without the restart prompt and reports the requirements. */
+	if (ctdRestartRequirements) {
+		*ctdRestartRequirements = restartRequirements;
+		return;
+	}
 
 	if (!restartRequirements.empty()) {
 		std::string requirements = std::accumulate(
