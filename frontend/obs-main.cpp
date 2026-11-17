@@ -16,6 +16,7 @@
 ******************************************************************************/
 
 #include <OBSApp.hpp>
+#include <ctd/ctd-version.hpp>
 
 #include <components/VolumeAccessibleInterface.hpp>
 #ifdef __APPLE__
@@ -1058,7 +1059,8 @@ int main(int argc, char *argv[])
 			exit(0);
 
 		} else if (arg_is(argv[i], "--version", "-V")) {
-			std::cout << "OBS Studio - " << App()->GetVersionString(false) << "\n";
+			std::cout << "CTD OBS " << CtdVersionString() << " (based on OBS Studio " << obs_get_version_string()
+				  << ")\n";
 			exit(0);
 		}
 	}
