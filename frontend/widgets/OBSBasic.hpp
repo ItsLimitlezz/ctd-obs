@@ -1735,6 +1735,7 @@ private:
 
 public:
 	void CtdOpenSettings();
+	bool ctdSettingsOpenOnCtdPage = false;
 
 public:
 #ifdef YOUTUBE_ENABLED
