@@ -8,6 +8,7 @@ Base: OBS Studio 33.0.1.
 | Area | What changed | Where |
 |---|---|---|
 | Config | `ctd-obs` folder instead of `obs-studio` for settings, scenes, logs, plugins and the shader cache | `frontend/` paths, `libobs-d3d11/d3d11-subsystem.cpp`, `libobs-d3d11/d3d11-shader.cpp` |
+| CTD settings folder | Proc `ctd_config_dir`: `<config>/ctd-obs/ctd`, where the CTD plugin keeps its settings files (it copies them there once from `plugin_config/ctd-live-source/`, keeping the old ones); Profile ▸ Export also writes the CTD settings without secrets to `<profile>/ctd`, and Profile ▸ Import reads them (`ctd_settings_export` / `ctd_settings_import`). The vertical canvas's `config.json` stays in `plugin_config/vertical-canvas/` | new `frontend/ctd/ctd-config.cpp`, `frontend/cmake/ctd-config.cmake`, `frontend/CMakeLists.txt`, `frontend/widgets/OBSBasic.cpp`, `frontend/widgets/OBSBasic.hpp`, `frontend/widgets/OBSBasic_Profiles.cpp` |
 | Running beside OBS | Its own single-instance check | `frontend/utility/platform-windows.cpp` |
 | Updates | Updater off, update menu items hidden | `frontend/obs-main.cpp`, `frontend/widgets/OBSBasic.cpp` |
 | OBS's servers | No What's New, service list, game-capture data or wizard platform ingest downloads | `frontend/cmake/feature-whatsnew.cmake`, `plugins/rtmp-services/CMakeLists.txt`, `plugins/win-capture/plugin-main.c` |

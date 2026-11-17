@@ -926,6 +926,7 @@ void OBSBasic::OBSInit()
 	// but after initializing global settings, to ensure legacy code gets valid path information.
 	RefreshSceneCollections(true);
 
+	CtdConfigRegisterProcs(); /* before modules load: they move their settings into the CTD folder */
 	CtdShowRegisterProcs();
 
 	App()->loadAppModules();
