@@ -11,10 +11,20 @@ permissions:
   contents: read
 jobs:
   macos-build:
-    name: macOS arm64
+    name: macOS arm64 (${{ matrix.host }})
     # OBS's build needs Xcode 26.5 (SDK 26.5) and a macOS 26 host (cmake/macos/compilerconfig.cmake,
-    # .github/scripts/utils.zsh/check_macos), which the macos-15 image doesn't have. macos-26 is Apple Silicon too.
-    runs-on: macos-26
+    # .github/scripts/utils.zsh/check_macos), which the macos-15 image doesn't have. Both hosts build the same Apple
+    # Silicon (arm64) app: macos-26 natively, macos-26-intel cross-compiling, because GitHub's arm64 Macs are often
+    # short of capacity ("job was not acquired by Runner"). Use whichever artifact finishes first.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: macos-26
+            artifactSuffix: ''
+          - host: macos-26-intel
+            artifactSuffix: '-intel-host'
+    runs-on: ${{ matrix.host }}
     defaults:
       run:
         shell: zsh --no-rcs --errexit --pipefail {0}
@@ -43,8 +53,9 @@ jobs:
         id: xcode-cache
         with:
           path: ${{ steps.setup.outputs.xcodeCasPath }}
-          key: macOS-ctd-xcode-arm64-RelWithDebInfo-${{ github.run_id }}-${{ github.run_attempt }}
+          key: macOS-ctd-xcode-arm64-${{ matrix.host }}-RelWithDebInfo-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
+            macOS-ctd-xcode-arm64-${{ matrix.host }}-RelWithDebInfo-
             macOS-ctd-xcode-arm64-RelWithDebInfo-
 
       # No Developer ID yet: the build is signed ad hoc ("-", the default when codesign is off) and re-signed ad hoc
@@ -128,7 +139,7 @@ jobs:
       - name: Upload package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ctd-obs-macos-arm64-${{ github.sha }}
+          name: ctd-obs-macos-arm64-${{ github.sha }}${{ matrix.artifactSuffix }}
           path: ${{ github.workspace }}/build_macos/${{ steps.package.outputs.zipName }}
           if-no-files-found: error
 
@@ -142,9 +153,14 @@ jobs:
           local app='CTD OBS.app'
           local exe="${app}/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' ${app}/Contents/Info.plist)"
 
-          local out="$(${exe} --version)"
-          print "${out}"
-          if [[ ${out} != 'CTD OBS '* ]] { print '::error::--version did not report CTD OBS'; exit 1 }
+          # an Intel runner can't execute the arm64 app (Rosetta only runs x86_64 code)
+          if [[ $(uname -m) == arm64 ]] {
+            local out="$(${exe} --version)"
+            print "${out}"
+            if [[ ${out} != 'CTD OBS '* ]] { print '::error::--version did not report CTD OBS'; exit 1 }
+          } else {
+            print 'Intel host: --version skipped'
+          }
 
           # every @rpath library the CTD modules link must be inside the bundle
           local -i missing=0
@@ -162,4 +178,4 @@ jobs:
         if: always() && steps.setup.outcome == 'success'
         with:
           path: ${{ steps.setup.outputs.xcodeCasPath }}
-          key: macOS-ctd-xcode-arm64-RelWithDebInfo-${{ github.run_id }}-${{ github.run_attempt }}
+          key: macOS-ctd-xcode-arm64-${{ matrix.host }}-RelWithDebInfo-${{ github.run_id }}-${{ github.run_attempt }}

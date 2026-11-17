@@ -12,6 +12,8 @@ Needs macOS 13 or later on an Apple Silicon Mac.
 1. On the Mac, sign in to GitHub and open the build: **github.com/ItsLimitlezz/ctd-obs → Actions → CTD OBS macOS**, then
    the run for the commit you want (green tick).
 2. At the bottom of the run page, under **Artifacts**, click **`ctd-obs-macos-arm64-<commit>`**. A `.zip` downloads.
+   `ctd-obs-macos-arm64-<commit>-intel-host` is the same Apple Silicon app, built on an Intel runner when GitHub has no
+   Apple Silicon runner free; either one is fine.
 3. In Downloads, double-click the zip (Safari may already have opened it into a folder). Inside is a second zip,
    `ctd-obs-<version>-<commit>-macos-arm64.zip`: double-click it too. You get **CTD OBS** (`CTD OBS.app`).
 
