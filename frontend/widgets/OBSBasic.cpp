@@ -1121,10 +1121,12 @@ void OBSBasic::OBSInit()
 
 	if (!dockStateStr) {
 		on_resetDocks_triggered(true);
+		ctdDocksFreshLayout = true;
 	} else {
 		QByteArray dockState = QByteArray::fromBase64(QByteArray(dockStateStr));
 		if (!restoreState(dockState)) {
 			on_resetDocks_triggered(true);
+			ctdDocksFreshLayout = true;
 		}
 	}
 
@@ -1263,6 +1265,13 @@ void OBSBasic::OnFirstLoad()
 	CtdShowFinishLoading();
 
 	OnEvent(OBS_FRONTEND_EVENT_FINISHED_LOADING);
+
+	/* CTD OBS: a fresh layout (first run) lays the CTD docks out once more, after the vertical canvas has placed its
+	 * own docks on FINISHED_LOADING, so CTD Relay ends up docked on the right and visible */
+	if (ctdDocksFreshLayout) {
+		ctdDocksFreshLayout = false;
+		ResetCtdDocks();
+	}
 
 #ifdef WHATSNEW_ENABLED
 	/* Attempt to load init screen if available */

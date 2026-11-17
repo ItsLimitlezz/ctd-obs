@@ -454,6 +454,12 @@ private:
 	QPointer<OBSDock> controlsDock;
 	QPointer<OBSDock> mixerDock;
 
+	/* CTD OBS: the docks of CTD OBS's built-in modules are laid out like OBS's own */
+	bool ctdDocksFreshLayout = false;
+	static bool IsCtdBuiltInDock(const QString &name);
+	QDockWidget *FindExtraDock(const char *name) const;
+	void ResetCtdDocks();
+
 public:
 	void AddDockWidget(QDockWidget *dock, Qt::DockWidgetArea area, bool extraBrowser = false);
 	void RemoveDockWidget(const QString &name);
