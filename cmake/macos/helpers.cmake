@@ -52,23 +52,33 @@ function(set_target_properties_obs target)
           XCODE_EMBED_PLUGINS_CODE_SIGN_ON_COPY YES
       )
 
+      # CTD OBS: its own bundle identifier and name, so it runs beside OBS Studio (separate single-instance check,
+      # permissions and preferences). The executable and the build's bundle stay "OBS" (CEF helpers and OBS's build
+      # scripts expect that name); the CI package renames the bundle to "CTD OBS.app". The version is CTD OBS's own
+      # (CTD-VERSION, set in frontend/cmake/ctd-version.cmake).
+      if(CTD_OBS_VERSION)
+        set(_ctd_marketing_version "${CTD_OBS_VERSION}")
+      else()
+        set(_ctd_marketing_version "${OBS_VERSION_CANONICAL}")
+      endif()
+
       set_target_xcode_properties(
         ${target}
-        PROPERTIES PRODUCT_BUNDLE_IDENTIFIER com.obsproject.obs-studio
+        PROPERTIES PRODUCT_BUNDLE_IDENTIFIER com.cinetechdigital.ctd-obs
                    PRODUCT_NAME OBS
                    ASSETCATALOG_COMPILER_APPICON_NAME AppIcon
                    CURRENT_PROJECT_VERSION ${OBS_BUILD_NUMBER}
-                   MARKETING_VERSION ${OBS_VERSION_CANONICAL}
+                   MARKETING_VERSION ${_ctd_marketing_version}
                    GENERATE_INFOPLIST_FILE YES
                    COPY_PHASE_STRIP NO
                    CLANG_ENABLE_OBJC_ARC YES
                    SKIP_INSTALL NO
                    INSTALL_PATH "$(LOCAL_APPS_DIR)"
-                   INFOPLIST_KEY_CFBundleDisplayName "OBS Studio"
-                   INFOPLIST_KEY_NSHumanReadableCopyright "(c) 2012-${CURRENT_YEAR} Lain Bailey"
-                   INFOPLIST_KEY_NSCameraUsageDescription "OBS needs to access the camera to enable camera sources to work."
-                   INFOPLIST_KEY_NSMicrophoneUsageDescription "OBS needs to access the microphone to enable audio input."
-                   INFOPLIST_KEY_NSAppleEventsUsageDescription "OBS needs to access background events to enable hotkeys while not in focus."
+                   INFOPLIST_KEY_CFBundleDisplayName "CTD OBS"
+                   INFOPLIST_KEY_NSHumanReadableCopyright "CTD OBS by CineTech Digital, based on OBS Studio (c) 2012-${CURRENT_YEAR} Lain Bailey"
+                   INFOPLIST_KEY_NSCameraUsageDescription "CTD OBS needs to access the camera to enable camera sources to work."
+                   INFOPLIST_KEY_NSMicrophoneUsageDescription "CTD OBS needs to access the microphone to enable audio input."
+                   INFOPLIST_KEY_NSAppleEventsUsageDescription "CTD OBS needs to access background events to enable hotkeys while not in focus."
       )
 
       get_property(obs_dependencies GLOBAL PROPERTY _OBS_DEPENDENCIES)
