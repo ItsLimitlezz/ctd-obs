@@ -5,6 +5,7 @@
         CTD Relay / CTD Hub / Vertical    the docks' own show/hide actions
         Hub Servers…                      the CTD plugin's servers window
         CTD Settings…                     OBS Settings, on its CTD page
+        Check for Updates…                CTD OBS's update check (ctd-update.cpp)
         Advanced ▸ Plugin Manager… · Scripts… · WebSocket Server Settings…
 
     The menu is rebuilt each time it opens, so it follows whichever docks and
@@ -27,6 +28,8 @@
     the Free Software Foundation, either version 2 of the License, or
     (at your option) any later version.
 ******************************************************************************/
+
+#include "ctd-update-logic.hpp"
 
 #include <widgets/OBSBasic.hpp>
 
@@ -129,6 +132,13 @@ void OBSBasic::CtdMenuRebuild()
 	QAction *settings = ctdMenu->addAction(QTStr("CTD.Menu.Settings"));
 	settings->setMenuRole(QAction::NoRole);
 	connect(settings, &QAction::triggered, this, &OBSBasic::CtdOpenSettings);
+
+	/* frontend/ctd/ctd-update.cpp: CTD OBS's own update check (Windows and macOS builds) */
+	if (CtdCurrentPlatform() != CtdUpdatePlatform::Other) {
+		QAction *updates = ctdMenu->addAction(QTStr("CTD.Menu.CheckForUpdates"));
+		updates->setMenuRole(QAction::NoRole);
+		connect(updates, &QAction::triggered, this, &OBSBasic::CtdCheckForUpdates);
+	}
 
 	/* Gap 19: OBS's own advanced tools, linked here so CTD users find them next to the CTD items */
 	QMenu *advanced = ctdMenu->addMenu(QTStr("CTD.Menu.Advanced"));

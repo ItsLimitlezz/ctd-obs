@@ -8,7 +8,8 @@ set(_obs_version_canonical ${_obs_default_version})
 # Attempt to automatically discover expected OBS version
 if(NOT DEFINED OBS_VERSION_OVERRIDE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
   execute_process(
-    COMMAND git describe --always --tags --dirty=-modified
+    # CTD OBS: CTD OBS's own release tags (ctd-v<X.Y.Z>, ctd-v<X.Y.Z>-test.<N>) are not OBS versions
+    COMMAND git describe --always --tags --dirty=-modified --exclude "ctd-*"
     OUTPUT_VARIABLE _obs_version
     ERROR_VARIABLE _git_describe_err
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"

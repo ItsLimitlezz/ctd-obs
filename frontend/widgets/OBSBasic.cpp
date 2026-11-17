@@ -930,6 +930,7 @@ void OBSBasic::OBSInit()
 
 	CtdShowRegisterProcs();
 	CtdMenuInit();
+	CtdUpdateInit();
 
 	App()->loadAppModules();
 

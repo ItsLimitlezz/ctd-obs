@@ -44,7 +44,8 @@ function Package {
 
     Install-BuildDependencies -WingetFile "${ScriptHome}/.Wingetfile"
 
-    $GitDescription = Invoke-External git describe --tags --long
+    # CTD OBS's release tags (ctd-v*) are not OBS versions: describe from OBS's own tags
+    $GitDescription = Invoke-External git describe --tags --long --exclude 'ctd-*'
     $Tokens = ($GitDescription -split '-')
     $CommitVersion = $Tokens[0..$($Tokens.Count - 3)] -join '-'
     $CommitHash = $($Tokens[-1]).SubString(1)

@@ -73,7 +73,7 @@ bool opt_start_virtualcam = false;
 bool opt_minimize_tray = false;
 bool opt_allow_opengl = false;
 bool opt_always_on_top = false;
-bool opt_disable_updater = true; /* CTD OBS has no update service yet */
+bool opt_disable_updater = true; /* CTD OBS: OBS's updater stays off; CTD OBS has its own (frontend/ctd/ctd-update.cpp) */
 bool opt_disable_missing_files_check = false;
 string opt_starting_collection;
 string opt_starting_profile;
