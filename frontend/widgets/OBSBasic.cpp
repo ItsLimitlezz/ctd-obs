@@ -25,6 +25,8 @@
 #include "OBSBasicStats.hpp"
 #include "plugin-manager/PluginManager.hpp"
 
+#include <ctd/ctd-version.hpp>
+
 #include <obs-module.h>
 
 #ifdef YOUTUBE_ENABLED
@@ -337,7 +339,7 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	installEventFilter(shortcutFilter);
 
 	stringstream name;
-	name << "CTD OBS " << App()->GetVersionString();
+	name << "CTD OBS " << CtdVersionString() << ", based on OBS " << App()->GetVersionString();
 	blog(LOG_INFO, "%s", name.str().c_str());
 	blog(LOG_INFO, "---------------------------------");
 
@@ -2000,7 +2002,7 @@ void OBSBasic::UpdateTitleBar()
 		name << "Studio ";
 	}
 
-	name << App()->GetVersionString(false);
+	name << CtdVersionString();
 	if (safe_mode) {
 		name << " (" << Str("TitleBar.SafeMode") << ")";
 	}
