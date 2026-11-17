@@ -1688,6 +1688,16 @@ private:
 	void SetBroadcastFlowEnabled(bool enabled);
 
 	/* -------------------------------------
+	 * MARK: - CTD first run (frontend/ctd/ctd-first-run.cpp)
+	 * -------------------------------------
+	 */
+private:
+	void CtdFirstRunWelcome();
+
+public:
+	void CtdShowRelayPairing();
+
+	/* -------------------------------------
 	 * MARK: - CTD Show Profiles (frontend/ctd/ctd-show-api.cpp)
 	 * -------------------------------------
 	 */

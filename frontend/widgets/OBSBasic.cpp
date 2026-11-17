@@ -1165,7 +1165,8 @@ void OBSBasic::OBSInit()
 	}
 
 	if (!first_run && !has_last_version && !Active()) {
-		QMetaObject::invokeMethod(this, &OBSBasic::on_autoConfigure_triggered, Qt::QueuedConnection);
+		/* CTD OBS: pair with CTD Relay first; OBS's wizard is one click away there */
+		QMetaObject::invokeMethod(this, &OBSBasic::CtdFirstRunWelcome, Qt::QueuedConnection);
 	}
 
 #if (defined(_WIN32) || defined(__APPLE__)) && (OBS_RELEASE_CANDIDATE > 0 || OBS_BETA > 0)
