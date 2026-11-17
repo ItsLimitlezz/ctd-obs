@@ -25,6 +25,8 @@
 #include "OBSBasicStats.hpp"
 #include "plugin-manager/PluginManager.hpp"
 
+#include <ctd/ctd-version.hpp>
+
 #include <obs-module.h>
 
 #ifdef YOUTUBE_ENABLED
@@ -337,7 +339,7 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	installEventFilter(shortcutFilter);
 
 	stringstream name;
-	name << "CTD OBS " << App()->GetVersionString();
+	name << "CTD OBS " << CtdVersionString() << ", based on OBS " << App()->GetVersionString();
 	blog(LOG_INFO, "%s", name.str().c_str());
 	blog(LOG_INFO, "---------------------------------");
 
@@ -927,6 +929,7 @@ void OBSBasic::OBSInit()
 	RefreshSceneCollections(true);
 
 	CtdShowRegisterProcs();
+	CtdMenuInit();
 
 	App()->loadAppModules();
 
@@ -1121,10 +1124,12 @@ void OBSBasic::OBSInit()
 
 	if (!dockStateStr) {
 		on_resetDocks_triggered(true);
+		ctdDocksFreshLayout = true;
 	} else {
 		QByteArray dockState = QByteArray::fromBase64(QByteArray(dockStateStr));
 		if (!restoreState(dockState)) {
 			on_resetDocks_triggered(true);
+			ctdDocksFreshLayout = true;
 		}
 	}
 
@@ -1165,7 +1170,8 @@ void OBSBasic::OBSInit()
 	}
 
 	if (!first_run && !has_last_version && !Active()) {
-		QMetaObject::invokeMethod(this, &OBSBasic::on_autoConfigure_triggered, Qt::QueuedConnection);
+		/* CTD OBS: pair with CTD Relay first; OBS's wizard is one click away there */
+		QMetaObject::invokeMethod(this, &OBSBasic::CtdFirstRunWelcome, Qt::QueuedConnection);
 	}
 
 #if (defined(_WIN32) || defined(__APPLE__)) && (OBS_RELEASE_CANDIDATE > 0 || OBS_BETA > 0)
@@ -1263,6 +1269,13 @@ void OBSBasic::OnFirstLoad()
 	CtdShowFinishLoading();
 
 	OnEvent(OBS_FRONTEND_EVENT_FINISHED_LOADING);
+
+	/* CTD OBS: a fresh layout (first run) lays the CTD docks out once more, after the vertical canvas has placed its
+	 * own docks on FINISHED_LOADING, so CTD Relay ends up docked on the right and visible */
+	if (ctdDocksFreshLayout) {
+		ctdDocksFreshLayout = false;
+		ResetCtdDocks();
+	}
 
 #ifdef WHATSNEW_ENABLED
 	/* Attempt to load init screen if available */
@@ -2000,7 +2013,7 @@ void OBSBasic::UpdateTitleBar()
 		name << "Studio ";
 	}
 
-	name << App()->GetVersionString(false);
+	name << CtdVersionString();
 	if (safe_mode) {
 		name << " (" << Str("TitleBar.SafeMode") << ")";
 	}

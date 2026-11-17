@@ -214,8 +214,14 @@ void wsRegister()
 
 void procShowApply(void *, calldata_t *cd)
 {
+	/* The CTD plugin calls this proc with collection_path / profile_path (ctd-obs-plugin src/show/apply.c), while the
+	 * spec and the obs-websocket vendor use collection / profile. Accept both names so neither caller breaks. */
 	const char *collection = calldata_string(cd, "collection");
 	const char *profile = calldata_string(cd, "profile");
+	if (!collection || !*collection)
+		collection = calldata_string(cd, "collection_path");
+	if (!profile || !*profile)
+		profile = calldata_string(cd, "profile_path");
 	const std::string collectionPath = collection ? collection : "";
 	const std::string profilePath = profile ? profile : "";
 

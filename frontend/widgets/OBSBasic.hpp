@@ -454,6 +454,12 @@ private:
 	QPointer<OBSDock> controlsDock;
 	QPointer<OBSDock> mixerDock;
 
+	/* CTD OBS: the docks of CTD OBS's built-in modules are laid out like OBS's own */
+	bool ctdDocksFreshLayout = false;
+	static bool IsCtdBuiltInDock(const QString &name);
+	QDockWidget *FindExtraDock(const char *name) const;
+	void ResetCtdDocks();
+
 public:
 	void AddDockWidget(QDockWidget *dock, Qt::DockWidgetArea area, bool extraBrowser = false);
 	void RemoveDockWidget(const QString &name);
@@ -1688,6 +1694,16 @@ private:
 	void SetBroadcastFlowEnabled(bool enabled);
 
 	/* -------------------------------------
+	 * MARK: - CTD first run (frontend/ctd/ctd-first-run.cpp)
+	 * -------------------------------------
+	 */
+private:
+	void CtdFirstRunWelcome();
+
+public:
+	void CtdShowRelayPairing();
+
+	/* -------------------------------------
 	 * MARK: - CTD Show Profiles (frontend/ctd/ctd-show-api.cpp)
 	 * -------------------------------------
 	 */
@@ -1706,6 +1722,20 @@ public:
 			  bool &restartRequired);
 	bool CtdShowRefresh(std::string &error);
 	static bool CtdAnyOutputActive();
+
+	/* -------------------------------------
+	 * MARK: - CTD menu (frontend/ctd/ctd-menu.cpp)
+	 * -------------------------------------
+	 */
+private:
+	QPointer<QMenu> ctdMenu;
+
+	void CtdMenuInit();
+	void CtdMenuRebuild();
+
+public:
+	void CtdOpenSettings();
+	bool ctdSettingsOpenOnCtdPage = false;
 
 public:
 #ifdef YOUTUBE_ENABLED

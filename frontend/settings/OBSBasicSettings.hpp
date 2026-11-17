@@ -225,6 +225,15 @@ private:
 
 	/* Appearance */
 	void InitAppearancePage();
+
+	/* CTD OBS: the Settings ▸ CTD page (frontend/ctd/ctd-settings-page.cpp) */
+	int ctdPageRow = -1;
+	void CtdInitPage();
+
+public:
+	void CtdShowPage();
+
+private:
 	void enableAppearanceFontControls(bool enable);
 	void enableAppearanceDensityControls(bool enable);
 

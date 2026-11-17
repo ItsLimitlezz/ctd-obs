@@ -13,8 +13,8 @@ BEGIN
       VALUE "InternalName", "ctd-obs64"
       VALUE "OriginalFilename", "ctd-obs64.exe"
       VALUE "ProductName", "CTD OBS"
-      VALUE "ProductVersion", "${OBS_VERSION_CANONICAL}"
-      VALUE "Comments", "Based on OBS Studio. Free and open source software under the GPL."
+      VALUE "ProductVersion", "${CTD_OBS_VERSION}"
+      VALUE "Comments", "Based on OBS Studio ${OBS_VERSION_CANONICAL}. Free and open source software under the GPL."
       VALUE "LegalCopyright", "${OBS_LEGAL_COPYRIGHT}"
     END
   END

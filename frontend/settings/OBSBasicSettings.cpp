@@ -849,7 +849,12 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 
 	InitStreamPage();
 	InitAppearancePage();
+	CtdInitPage();
 	LoadSettings(false);
+	if (main && main->ctdSettingsOpenOnCtdPage) {
+		main->ctdSettingsOpenOnCtdPage = false;
+		CtdShowPage();
+	}
 
 	ui->advOutTrack1->setAccessibleName(QTStr("Basic.Settings.Output.Adv.Audio.Track1"));
 	ui->advOutTrack2->setAccessibleName(QTStr("Basic.Settings.Output.Adv.Audio.Track2"));
