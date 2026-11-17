@@ -652,6 +652,9 @@ void OBSBasic::on_actionImportProfile_triggered()
 			}
 		}
 
+		/* CTD OBS: the CTD settings exported with the profile (gap 17) */
+		CtdImportProfileSettings(sourcePath);
+
 		RefreshProfiles(true);
 	}
 }
@@ -696,6 +699,9 @@ void OBSBasic::on_actionExportProfile_triggered()
 				return;
 			}
 		}
+
+		/* CTD OBS: the CTD settings, without secrets (gap 17) */
+		CtdExportProfileSettings(destinationPath);
 	}
 }
 

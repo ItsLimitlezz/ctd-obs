@@ -1688,6 +1688,15 @@ private:
 	void SetBroadcastFlowEnabled(bool enabled);
 
 	/* -------------------------------------
+	 * MARK: - CTD settings folder (frontend/ctd/ctd-config.cpp)
+	 * -------------------------------------
+	 */
+private:
+	void CtdConfigRegisterProcs();
+	void CtdExportProfileSettings(const std::filesystem::path &profileExportDir);
+	void CtdImportProfileSettings(const std::filesystem::path &profileSourceDir);
+
+	/* -------------------------------------
 	 * MARK: - CTD Show Profiles (frontend/ctd/ctd-show-api.cpp)
 	 * -------------------------------------
 	 */
