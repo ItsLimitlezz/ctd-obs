@@ -11,8 +11,6 @@
 
 using namespace json11;
 
-extern bool steam;
-
 OBSAbout::OBSAbout(QWidget *parent) : QDialog(parent), ui(new Ui::OBSAbout)
 {
 	setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
@@ -31,21 +29,10 @@ OBSAbout::OBSAbout(QWidget *parent) : QDialog(parent), ui(new Ui::OBSAbout)
 
 	ui->version->setText(ver + bitness);
 
-	ui->contribute->setText(QTStr("About.Contribute"));
-
-	if (steam) {
-		delete ui->donate;
-	} else {
-		ui->donate->setText("&nbsp;&nbsp;<a href='https://obsproject.com/contribute'>" + QTStr("About.Donate") +
-				    "</a>");
-		ui->donate->setTextInteractionFlags(Qt::TextBrowserInteraction);
-		ui->donate->setOpenExternalLinks(true);
-	}
-
-	ui->getInvolved->setText("&nbsp;&nbsp;<a href='https://obsproject.com/developer-contributing'>" +
-				 QTStr("About.GetInvolved") + "</a>");
-	ui->getInvolved->setTextInteractionFlags(Qt::TextBrowserInteraction);
-	ui->getInvolved->setOpenExternalLinks(true);
+	/* CTD OBS: no OBS donate / "Get Involved" links (they point at the OBS Project) */
+	ui->contribute->hide();
+	ui->donate->hide();
+	ui->getInvolved->hide();
 
 	ui->about->setText("<a href='#'>" + QTStr("About") + "</a>");
 	ui->authors->setText("<a href='#'>" + QTStr("About.Authors") + "</a>");
@@ -62,19 +49,8 @@ OBSAbout::OBSAbout(QWidget *parent) : QDialog(parent), ui(new Ui::OBSAbout)
 	connect(ui->authors, &ClickableLabel::clicked, this, &OBSAbout::ShowAuthors);
 	connect(ui->license, &ClickableLabel::clicked, this, &OBSAbout::ShowLicense);
 
-	QPointer<OBSAbout> about(this);
-
-	OBSBasic *main = OBSBasic::Get();
-	if (main->patronJson.empty() && !main->patronJsonThread) {
-		RemoteTextThread *thread =
-			new RemoteTextThread("https://obsproject.com/patreon/about-box.json", "application/json");
-		QObject::connect(thread, &RemoteTextThread::Result, main, &OBSBasic::UpdatePatronJson);
-		QObject::connect(thread, &RemoteTextThread::Result, this, &OBSAbout::ShowAbout);
-		main->patronJsonThread.reset(thread);
-		thread->start();
-	} else {
-		ShowAbout();
-	}
+	/* CTD OBS: no download of the OBS Patreon list from obsproject.com */
+	ShowAbout();
 }
 
 void OBSAbout::ShowAbout()
