@@ -60,6 +60,18 @@ if(OS_WINDOWS OR OS_MACOS)
   add_subdirectory(ctd-vertical-canvas)
   target_enable(vertical-canvas)
 endif()
+# CTD OBS: the CTD modules are kept warning-free for MSVC (/WX). On macOS, clang's extra warnings (e.g. Qt's foreach
+# deprecation in the vertical canvas) stay in the build log but don't fail the build.
+if(OS_MACOS)
+  foreach(_ctd_target IN ITEMS ctd-live-source ctd-engine vertical-canvas)
+    if(TARGET ${_ctd_target})
+      set_target_properties(
+        ${_ctd_target}
+        PROPERTIES COMPILE_WARNING_AS_ERROR OFF XCODE_ATTRIBUTE_GCC_TREAT_WARNINGS_AS_ERRORS NO
+      )
+    endif()
+  endforeach()
+endif()
 add_core_module(
     decklink
     PLATFORMS WINDOWS MACOS LINUX
