@@ -1,7 +1,9 @@
 # CTD OBS: the CTD OBS version, from CTD-VERSION at the repository root (Major.Minor.Patch, per the hub's
 # CONVENTIONS.md; a Major bump is Juan's call). Shown in the title bar, About, the log and the Windows file details.
 # OBS_VERSION stays OBS's own version (libobs, plugins and the log still report it).
-file(READ "${CMAKE_SOURCE_DIR}/CTD-VERSION" _ctd_version_file)
+# file(STRINGS) skips a UTF-8 BOM (Notepad adds one); a changed CTD-VERSION re-runs the configure step
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/CTD-VERSION")
+file(STRINGS "${CMAKE_SOURCE_DIR}/CTD-VERSION" _ctd_version_file LIMIT_COUNT 1)
 string(STRIP "${_ctd_version_file}" _ctd_version_file)
 if(NOT _ctd_version_file MATCHES "^([0-9]+\\.[0-9]+\\.[0-9]+)$")
   message(FATAL_ERROR "CTD-VERSION must hold one line <MAJOR>.<MINOR>.<PATCH>, not '${_ctd_version_file}'")

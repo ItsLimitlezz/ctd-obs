@@ -26,6 +26,10 @@
 #include <sstream>
 #include <string_view>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include "moc_CrashHandler.cpp"
 
 using json = nlohmann::json;
@@ -92,6 +96,26 @@ std::pair<OBS::TimePoint, std::string> buildCrashLogUploadContent(OBS::PlatformT
 
 	return std::pair<OBS::TimePoint, std::string>(uploadTimePoint, uploadLogMessage.str());
 }
+
+/* CTD OBS: each instance keeps its own sentinel open without sharing delete access for as long as it runs.
+ * Windows closes that handle when the process ends for any reason (clean exit, crash, kill), so a sentinel
+ * that cannot be opened for deletion belongs to an instance that is still running: it is neither a crash nor
+ * stale, and must not be reported or removed. */
+bool isSentinelHeldByRunningInstance([[maybe_unused]] const std::filesystem::path &sentinelFile)
+{
+#ifdef _WIN32
+	HANDLE handle = CreateFileW(sentinelFile.c_str(), DELETE,
+				    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+				    FILE_ATTRIBUTE_NORMAL, nullptr);
+
+	if (handle == INVALID_HANDLE_VALUE) {
+		return GetLastError() == ERROR_SHARING_VIOLATION;
+	}
+
+	CloseHandle(handle);
+#endif
+	return false;
+}
 } // namespace
 
 namespace OBS {
@@ -120,6 +144,7 @@ CrashHandler::~CrashHandler()
 CrashHandler::CrashHandler(CrashHandler &&other) noexcept
 {
 	crashLogUploadThread_ = std::exchange(other.crashLogUploadThread_, nullptr);
+	crashSentinelHandle_ = std::exchange(other.crashSentinelHandle_, nullptr);
 	isActiveCrashHandler_ = true;
 	other.isActiveCrashHandler_ = false;
 }
@@ -127,6 +152,7 @@ CrashHandler::CrashHandler(CrashHandler &&other) noexcept
 CrashHandler &CrashHandler::operator=(CrashHandler &&other) noexcept
 {
 	std::swap(crashLogUploadThread_, other.crashLogUploadThread_);
+	std::swap(crashSentinelHandle_, other.crashSentinelHandle_);
 	isActiveCrashHandler_ = true;
 	other.isActiveCrashHandler_ = false;
 	return *this;
@@ -216,8 +242,29 @@ void CrashHandler::checkCrashState()
 			continue;
 		}
 
+		if (isSentinelHeldByRunningInstance(entry.path())) {
+			blog(LOG_INFO, "Crash sentinel '%s' belongs to another running instance, not a crash",
+			     entryFileName.c_str());
+			continue;
+		}
+
 		isSentinelPresent_ = true;
 	}
+
+#ifdef _WIN32
+	if (!crashSentinelHandle_) {
+		HANDLE handle = CreateFileW(crashSentinelFile_.c_str(), GENERIC_WRITE,
+					    FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS,
+					    FILE_ATTRIBUTE_NORMAL, nullptr);
+
+		if (handle != INVALID_HANDLE_VALUE) {
+			crashSentinelHandle_ = handle;
+			currentSentinelFound = true;
+		} else {
+			blog(LOG_ERROR, "Unable to create crash sentinel file (error %lu)", GetLastError());
+		}
+	}
+#endif
 
 	if (!currentSentinelFound) {
 		std::fstream filestream;
@@ -362,6 +409,13 @@ void CrashHandler::applicationShutdownHandler() noexcept
 		return;
 	}
 
+#ifdef _WIN32
+	if (crashSentinelHandle_) {
+		CloseHandle(static_cast<HANDLE>(crashSentinelHandle_));
+		crashSentinelHandle_ = nullptr;
+	}
+#endif
+
 	const std::filesystem::path crashSentinelPath = crashSentinelFile_.parent_path();
 
 	if (!std::filesystem::exists(crashSentinelPath)) {
@@ -377,6 +431,11 @@ void CrashHandler::applicationShutdownHandler() noexcept
 		std::string entryFileName = entry.path().filename().u8string();
 
 		if (entryFileName.rfind(crashSentinelPrefix.data(), 0) != 0) {
+			continue;
+		}
+
+		/* CTD OBS: leave the sentinels of other instances that are still running */
+		if (isSentinelHeldByRunningInstance(entry.path())) {
 			continue;
 		}
 

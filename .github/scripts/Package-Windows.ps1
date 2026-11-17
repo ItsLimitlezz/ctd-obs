@@ -51,7 +51,7 @@ function Package {
     $CommitDistance = $Tokens[-2]
 
     # CTD OBS's own version (CTD-VERSION, Major.Minor.Patch), not the OBS release it is based on
-    $CtdVersion = (Get-Content -Path "${ProjectRoot}/CTD-VERSION" -TotalCount 1).Trim()
+    $CtdVersion = (Get-Content -Path "${ProjectRoot}/CTD-VERSION" -TotalCount 1).Trim().TrimStart([char]0xFEFF)
     if ( ! ( $CtdVersion -match '^\d+\.\d+\.\d+$' ) ) {
         throw "CTD-VERSION must hold <MAJOR>.<MINOR>.<PATCH>, not '${CtdVersion}'"
     }

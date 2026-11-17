@@ -41,6 +41,8 @@ class CrashHandler : public QObject {
 private:
 	QUuid appLaunchUUID_;
 	std::filesystem::path crashSentinelFile_;
+	/* CTD OBS: Windows handle that keeps this instance's sentinel open while it runs */
+	void *crashSentinelHandle_ = nullptr;
 
 	TimePoint lastCrashUploadTime_;
 	std::filesystem::path lastCrashLogFile_;
