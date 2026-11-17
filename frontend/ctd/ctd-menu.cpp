@@ -3,7 +3,7 @@
 
       CTD
         CTD Relay / CTD Hub / Vertical    the docks' own show/hide actions
-        Live Servers…                     the CTD plugin's servers window
+        Hub Servers…                      the CTD plugin's servers window
         CTD Settings…                     OBS Settings
         Advanced ▸ Plugin Manager… · Scripts… · WebSocket Server Settings…
 
@@ -14,7 +14,7 @@
 
       void ctd_menu_available(out bool available)
           Registered before modules load. When it exists, the CTD plugin leaves
-          its "CTD Live servers…" item out of Tools, since this menu has it.
+          its servers item out of Tools, since this menu has it.
 
     Called here, registered by the CTD plugin (ctd-obs-plugin, src/ui/servers-dialog.cpp):
 
@@ -42,8 +42,8 @@ static const char *const kCtdMenuDocks[] = {"ctd-multistream", "ctd-hub", "Verti
 /* The CTD plugin's module (plugins/ctd-live-source) */
 static const char *const kCtdPluginModule = "ctd-live-source";
 
-/* The CTD plugin's Tools item before it had ctd_servers_dialog_open (its text was hard-coded English) */
-static const char *const kLegacyServersToolsItem = "CTD Live servers…";
+/* The CTD plugin's Tools item before it had ctd_servers_dialog_open (hard-coded English; renamed in its text pass) */
+static const char *const kLegacyServersToolsItems[] = {"CTD Hub servers…", "CTD Live servers…"};
 
 static void CtdMenuAvailableProc(void *, calldata_t *cd)
 {
@@ -116,8 +116,11 @@ void OBSBasic::CtdMenuRebuild()
 		if (opened) {
 			return;
 		}
-		if (QAction *legacy = FindToolsAction(ui->menuTools, nullptr, kLegacyServersToolsItem)) {
-			legacy->trigger();
+		for (const char *text : kLegacyServersToolsItems) {
+			if (QAction *legacy = FindToolsAction(ui->menuTools, nullptr, text)) {
+				legacy->trigger();
+				return;
+			}
 		}
 	});
 	/* the plugin (its proc or, if older, its Tools item) must be there for the item to do anything */
