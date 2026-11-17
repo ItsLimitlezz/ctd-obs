@@ -20,7 +20,7 @@
 
       void ctd_servers_dialog_open()
           Opens the servers window. A plugin without it still has its Tools
-          item, which Live Servers… then triggers instead.
+          item, which Hub Servers… then triggers instead.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
