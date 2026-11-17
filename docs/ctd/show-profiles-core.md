@@ -63,6 +63,8 @@ Errors (`error` starts with one of these):
 
 Rescans `basic/scenes` and `basic/profiles`, rebuilds both menus, and raises `PROFILE_LIST_CHANGED` and `SCENE_COLLECTION_LIST_CHANGED`. It loads and saves nothing. Use it after adding or removing collection or profile files that aren't being applied. It fails with `busy: …` while a load or an apply is running.
 
+The active scene collection always stays in the list, with its in-memory state, even when the rescan doesn't find its file. On a fresh config OBS makes "Untitled" in memory and writes its file with its first queued save, which runs after `FINISHED_LOADING`; the plugin's availability probe calls `ctd_show_refresh` during `FINISHED_LOADING`, so a plain rescan would drop the collection and every later save would fail.
+
 ### Rules for T7
 
 - **Never write into `basic/scenes/` or `basic/profiles/` yourself.** Stage outside and let `ctd_show_apply` put the files in place; it is the only place where the copy and the load happen with no save in between.
