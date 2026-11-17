@@ -905,6 +905,11 @@ signals:
 private:
 	OBSProfileCache profiles{};
 
+	/* CTD OBS: one CTD settings folder, CTD settings in profile export/import (frontend/ctd/ctd-config.cpp) */
+	void CtdConfigRegisterProcs();
+	void CtdExportProfileSettings(const std::filesystem::path &profileExportDir);
+	void CtdImportProfileSettings(const std::filesystem::path &profileSourceDir);
+
 	void SetupNewProfile(const std::string &profileName, bool useWizard = false);
 	void SetupDuplicateProfile(const std::string &profileName);
 	void SetupRenameProfile(const std::string &profileName);
@@ -1686,15 +1691,6 @@ private:
 
 	void BroadcastButtonClicked();
 	void SetBroadcastFlowEnabled(bool enabled);
-
-	/* -------------------------------------
-	 * MARK: - CTD settings folder (frontend/ctd/ctd-config.cpp)
-	 * -------------------------------------
-	 */
-private:
-	void CtdConfigRegisterProcs();
-	void CtdExportProfileSettings(const std::filesystem::path &profileExportDir);
-	void CtdImportProfileSettings(const std::filesystem::path &profileSourceDir);
 
 	/* -------------------------------------
 	 * MARK: - CTD Show Profiles (frontend/ctd/ctd-show-api.cpp)
