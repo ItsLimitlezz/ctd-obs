@@ -58,6 +58,7 @@ include(cmake/ui-settings.cmake)
 include(cmake/ui-utility.cmake)
 include(cmake/ui-widgets.cmake)
 include(cmake/ctd-show.cmake)
+include(cmake/ctd-version.cmake)
 include(cmake/ui-wizards.cmake)
 
 if(NOT OAUTH_BASE_URL)

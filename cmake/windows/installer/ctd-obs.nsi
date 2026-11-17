@@ -7,8 +7,8 @@
 ; Defines passed by the packaging script (makensis /D...):
 ;   STAGING_DIR      Folder with the unpacked package (bin\, core\, data\, ...)
 ;   OUTPUT_FILE      Path of the installer to write
-;   VERSION          Display version, e.g. 33.0.1-abcdef1
-;   VERSION_NUMERIC  Four-part file version, e.g. 33.0.1.42
+;   VERSION          Display version (CTD-VERSION plus the commit for test builds), e.g. 0.10.0-abcdef1
+;   VERSION_NUMERIC  Four-part file version, e.g. 0.10.0.42
 ;   VCAM_DIR         Folder of the virtual camera DLLs relative to the install folder
 ;   VCREDIST_FILE    Path of vc_redist.x64.exe to bundle
 ;   VCREDIST_MINOR   Minor version of that runtime (e.g. 50 for 14.50)
