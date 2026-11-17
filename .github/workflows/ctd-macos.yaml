@@ -132,6 +132,32 @@ jobs:
           path: ${{ github.workspace }}/build_macos/${{ steps.package.outputs.zipName }}
           if-no-files-found: error
 
+      # After the upload, so a failure here still leaves the package to look at. OBS itself isn't started: GitHub's
+      # macOS VMs crash it in Qt (ctd-obs-plugin #33). --version exits before any UI, which still proves the signed
+      # bundle loads (dyld finds every linked library, the signature is accepted on arm64).
+      - name: Smoke test
+        run: |
+          : Smoke test
+          cd build_macos
+          local app='CTD OBS.app'
+          local exe="${app}/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' ${app}/Contents/Info.plist)"
+
+          local out="$(${exe} --version)"
+          print "${out}"
+          if [[ ${out} != 'CTD OBS '* ]] { print '::error::--version did not report CTD OBS'; exit 1 }
+
+          # every @rpath library the CTD modules link must be inside the bundle
+          local -i missing=0
+          local plugin lib name
+          for plugin (ctd-live-source vertical-canvas) {
+            for lib (${(f)"$(otool -L ${app}/Contents/PlugIns/${plugin}.plugin/Contents/MacOS/${plugin} | awk 'NR>1 && $1 ~ /^@rpath\// {print $1}')"}) {
+              name=${lib#@rpath/}
+              if [[ ! -e ${app}/Contents/Frameworks/${name} ]] { print "::error::${plugin}: ${lib} not in the bundle"; missing=1 }
+            }
+          }
+          if (( missing )) exit 1
+          print 'CTD modules: all @rpath libraries present'
+
       - uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         if: always() && steps.setup.outcome == 'success'
         with:
