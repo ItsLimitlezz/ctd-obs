@@ -143,8 +143,8 @@ void OBSBasic::CtdMenuRebuild()
 
 void OBSBasic::CtdOpenSettings()
 {
-	/* OBSBasicSettings opens on its CTD page while this is set (frontend/ctd/ctd-settings-page.cpp) */
+	/* One-shot: the next OBSBasicSettings opens on its CTD page and clears it (frontend/ctd/ctd-settings-page.cpp).
+	 * Not cleared here, because on_action_Settings_triggered may defer itself by a second (inside an event loop). */
 	ctdSettingsOpenOnCtdPage = true;
 	on_action_Settings_triggered();
-	ctdSettingsOpenOnCtdPage = false;
 }

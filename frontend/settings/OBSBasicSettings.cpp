@@ -852,6 +852,7 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	CtdInitPage();
 	LoadSettings(false);
 	if (main && main->ctdSettingsOpenOnCtdPage) {
+		main->ctdSettingsOpenOnCtdPage = false;
 		CtdShowPage();
 	}
 
