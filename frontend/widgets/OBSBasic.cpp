@@ -927,6 +927,7 @@ void OBSBasic::OBSInit()
 	RefreshSceneCollections(true);
 
 	CtdShowRegisterProcs();
+	CtdMenuInit();
 
 	App()->loadAppModules();
 
