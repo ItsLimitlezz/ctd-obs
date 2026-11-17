@@ -4,7 +4,7 @@
       CTD
         CTD Relay / CTD Hub / Vertical    the docks' own show/hide actions
         Hub Servers…                      the CTD plugin's servers window
-        CTD Settings…                     OBS Settings
+        CTD Settings…                     OBS Settings, on its CTD page
         Advanced ▸ Plugin Manager… · Scripts… · WebSocket Server Settings…
 
     The menu is rebuilt each time it opens, so it follows whichever docks and
@@ -143,5 +143,8 @@ void OBSBasic::CtdMenuRebuild()
 
 void OBSBasic::CtdOpenSettings()
 {
+	/* OBSBasicSettings opens on its CTD page while this is set (frontend/ctd/ctd-settings-page.cpp) */
+	ctdSettingsOpenOnCtdPage = true;
 	on_action_Settings_triggered();
+	ctdSettingsOpenOnCtdPage = false;
 }
