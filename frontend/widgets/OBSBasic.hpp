@@ -1713,6 +1713,19 @@ public:
 	bool CtdShowRefresh(std::string &error);
 	static bool CtdAnyOutputActive();
 
+	/* -------------------------------------
+	 * MARK: - CTD menu (frontend/ctd/ctd-menu.cpp)
+	 * -------------------------------------
+	 */
+private:
+	QPointer<QMenu> ctdMenu;
+
+	void CtdMenuInit();
+	void CtdMenuRebuild();
+
+public:
+	void CtdOpenSettings();
+
 public:
 #ifdef YOUTUBE_ENABLED
 	void NewYouTubeAppDock();
