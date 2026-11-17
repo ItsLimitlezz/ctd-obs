@@ -142,6 +142,12 @@ static optional<OBSTheme> ParseThemeMeta(const QString &path)
 		meta.location = absolute(filepath);
 		meta.isHighContrast = path.endsWith(".oha");
 		meta.isVisible = !path.contains("System");
+
+		/* CTD OBS: only CTD themes are offered. OBS's own Yami variants stay installed (CTD Night builds on Yami,
+		 * and an old choice of one still loads until InitTheme moves it to CTD Night) but are hidden. */
+		if (!meta.isBaseTheme && meta.id.startsWith("com.obsproject.")) {
+			meta.isVisible = false;
+		}
 	}
 
 	return meta;
@@ -1083,6 +1089,17 @@ bool OBSApp::InitTheme()
 	}
 
 	QString themeName = config_get_string(userConfig, "Appearance", "Theme");
+
+	/* CTD OBS: a saved choice of one of OBS's own themes (bare Yami or a hidden Yami variant) moves to CTD Night.
+	 * The System theme stays, it is the high-contrast fallback. */
+	if (const OBSTheme *saved = GetTheme(themeName); saved && !saved->isHighContrast &&
+							   saved->id != "com.obsproject.System" &&
+							   (!saved->isVisible || saved->id == "com.obsproject.Yami")) {
+		blog(LOG_INFO, "Theme \"%s\" is not offered in CTD OBS, using \"%s\".", QT_TO_UTF8(themeName),
+		     DEFAULT_THEME);
+		themeName = DEFAULT_THEME;
+		config_set_string(userConfig, "Appearance", "Theme", DEFAULT_THEME);
+	}
 
 	if (themeName.isEmpty() || !GetTheme(themeName)) {
 		if (!themeName.isEmpty()) {
