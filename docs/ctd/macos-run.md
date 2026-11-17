@@ -1,9 +1,11 @@
 # Running CTD OBS on a Mac (Apple Silicon)
 
 Test builds of CTD OBS for Apple Silicon Macs (M1 and later) come from GitHub Actions (`.github/workflows/ctd-macos.yaml`,
-every push to a `ctd/**` branch). They are **signed ad hoc, not notarized** (there is no Developer ID yet), so macOS
-needs one Terminal command before the first launch. CTD OBS runs **beside OBS Studio**: its own app, its own settings
-folder (`~/Library/Application Support/ctd-obs`), its own permissions. Nothing of OBS Studio's is read or changed.
+every push to a `ctd/**` branch). Once CTD's signing secrets are set they are **signed with CineTech Digital's Developer
+ID and notarized by Apple** (`docs/ctd/macos-signing.md`): they install like any Mac app. The run's summary says
+**Developer ID, notarized** or **ad hoc, not notarized**; an ad hoc build needs one Terminal command before the first
+launch (step 2.3). CTD OBS runs **beside OBS Studio**: its own app, its own settings folder
+(`~/Library/Application Support/ctd-obs`), its own permissions. Nothing of OBS Studio's is read or changed.
 
 Needs macOS 13 or later on an Apple Silicon Mac.
 
@@ -12,6 +14,8 @@ Needs macOS 13 or later on an Apple Silicon Mac.
 1. On the Mac, sign in to GitHub and open the build: **github.com/ItsLimitlezz/ctd-obs → Actions → CTD OBS macOS**, then
    the run for the commit you want (green tick).
 2. At the bottom of the run page, under **Artifacts**, click **`ctd-obs-macos-arm64-<commit>`**. A `.zip` downloads.
+   A signed build also has a disk image in it (`ctd-obs-<version>-<commit>-macos-arm64.dmg`): you can open that instead
+   of the inner zip in step 3 and drag **CTD OBS** onto **Applications** in its window.
    `ctd-obs-macos-arm64-<commit>-intel-host` is the same Apple Silicon app, built on an Intel runner when GitHub has no
    Apple Silicon runner free; either one is fine.
 3. In Downloads, double-click the zip (Safari may already have opened it into a folder). Inside is a second zip,
@@ -24,29 +28,33 @@ Needs macOS 13 or later on an Apple Silicon Mac.
 
 1. Quit CTD OBS if an older test build is running.
 2. Drag **CTD OBS** into **Applications** (replace the old one if asked).
-3. Open **Terminal** and run:
+3. **Only for an ad hoc build** (summary says "ad hoc, not notarized"): open **Terminal** and run:
 
    ```sh
    xattr -dr com.apple.quarantine "/Applications/CTD OBS.app"
    ```
 
    This removes the "downloaded from the internet" mark. Without it macOS says the app "is damaged and can't be opened"
-   (that only means it isn't notarized).
+   (that only means it isn't notarized). A signed, notarized build needs none of this.
 
 ## 3. First launch
 
-1. In Applications, **right-click CTD OBS → Open**, then **Open** in the dialog. Later launches are a normal
-   double-click.
-   - If macOS still refuses: **System Settings → Privacy & Security**, scroll down, **Open Anyway** next to CTD OBS.
+1. In Applications, double-click **CTD OBS**. A signed build asks once whether to open an app downloaded from the
+   internet: **Open**. An ad hoc build: **right-click CTD OBS → Open**, then **Open** in the dialog; later launches are
+   a normal double-click.
+   - If macOS still refuses an ad hoc build: **System Settings → Privacy & Security**, scroll down, **Open Anyway**
+     next to CTD OBS.
 2. CTD OBS asks for permissions in its own window. Grant, for **CTD OBS**:
    - **Camera** (camera sources) and **Microphone** (audio inputs): allow in the prompt.
    - **Screen & System Audio Recording** (display/window capture): opens System Settings; switch **CTD OBS** on, then
      **quit and reopen CTD OBS** (macOS applies it only on restart).
    - **Accessibility** is only for global hotkeys; skip it unless you use them.
 
-   OBS Studio's permissions don't carry over: CTD OBS is a separate app (`com.cinetechdigital.ctd-obs`). A **new test
-   build may ask again** (ad hoc signatures change per build); if a source is black after an update, switch CTD OBS off
-   and on again in that Privacy & Security list, then restart CTD OBS.
+   OBS Studio's permissions don't carry over: CTD OBS is a separate app (`com.cinetechdigital.ctd-obs`). **Signed
+   builds keep these permissions across updates** (they belong to CTD's Developer ID and the bundle id). An **ad hoc
+   build may ask again** after each update (its signature changes per build); if a source is black after an update,
+   switch CTD OBS off and on again in that Privacy & Security list, then restart CTD OBS. Going from an ad hoc build to
+   the first signed one counts as a change, so it may ask once more then.
 3. **Welcome to CTD OBS** appears on the first run: choose **Later** for now if you're importing your OBS setup first
    (step 4), or **Pair with CTD Relay** to go straight to step 5.
 
@@ -104,10 +112,11 @@ Settings ▸ CTD, CTD Night theme, browser sources, WebSocket server.
 
 Not in, or untested:
 
-- **No virtual camera.** On macOS it needs a camera system extension signed with a Developer ID, which CTD doesn't
-  have yet. The Start Virtual Camera button isn't shown. (OBS Studio's virtual camera, if installed, is unaffected.)
+- **No virtual camera.** On macOS it needs a camera system extension with its own Developer ID provisioning profile
+  (what's needed: `docs/ctd/macos-signing.md`). The Start Virtual Camera button isn't shown. (OBS Studio's virtual
+  camera, if installed, is unaffected.)
 - **No auto-update** (same as Windows): install each test build by hand, steps 1–2.
-- Not notarized: the `xattr` step is needed for every new build.
+- Ad hoc builds (no signing secrets, e.g. from a fork) aren't notarized: the `xattr` step is needed for every new one.
 - Builds are never launched on GitHub's Macs (their virtual Macs crash OBS at start for an unrelated graphics reason),
   so **each build's first real launch is on your Mac**.
 
