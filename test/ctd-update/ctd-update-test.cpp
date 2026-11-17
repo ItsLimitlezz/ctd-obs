@@ -3,8 +3,11 @@
 #include "ctd-update-logic.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
+#include <stdexcept>
 #include <string>
+#include <thread>
 
 static int failures = 0;
 static int checks = 0;
@@ -270,6 +273,132 @@ static void TestSha256Sums()
 	CHECK(CtdParseSha256Sums("").empty());
 }
 
+static long long ElapsedMs(std::chrono::steady_clock::time_point start)
+{
+	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+}
+
+/* The launch check: whatever GitHub does, startup goes on within the time limit */
+static void TestRunCheck()
+{
+	using Status = CtdCheckResult::Status;
+	const auto W = CtdUpdatePlatform::Windows;
+	const auto S = CtdUpdateChannel::Stable;
+	const auto T = CtdUpdateChannel::Test;
+	const int limit = 3000;     /* answers that arrive: well inside the launch check's 3 s */
+	const int shortLimit = 300; /* servers that don't answer */
+
+	auto body = [](const std::string &text) {
+		return [text](const std::atomic<bool> &, std::string &out, std::string &) {
+			out = text;
+			return true;
+		};
+	};
+
+	/* an update */
+	auto start = std::chrono::steady_clock::now();
+	CtdCheckResult r = CtdRunCheck(body(kReleasesJson), V("0.10.0"), T, W, limit);
+	CHECK(r.status == Status::UpdateAvailable && r.update.tag == "ctd-v0.11.0-test.57" && r.releaseCount == 5);
+	CHECK(ElapsedMs(start) < limit);
+
+	/* nothing new */
+	r = CtdRunCheck(body(kReleasesJson), V("0.10.1"), S, W, limit);
+	CHECK(r.status == Status::UpToDate && r.error.empty());
+	r = CtdRunCheck(body("[]"), V("0.10.0"), S, W, limit);
+	CHECK(r.status == Status::UpToDate);
+
+	/* bad JSON, a GitHub error object (rate limit) */
+	start = std::chrono::steady_clock::now();
+	r = CtdRunCheck(body("<html>502 Bad Gateway</html>"), V("0.10.0"), S, W, limit);
+	CHECK(r.status == Status::Failed && !r.error.empty());
+	CHECK(ElapsedMs(start) < limit);
+	r = CtdRunCheck(body(R"({"message": "API rate limit exceeded for 1.2.3.4."})"), V("0.10.0"), S, W, limit);
+	CHECK(r.status == Status::Failed && r.error.find("rate limit") != std::string::npos);
+	r = CtdRunCheck(body("[{\"tag_name\": \"ctd-v1.0.0\", \"assets\": [tru"), V("0.10.0"), S, W, limit);
+	CHECK(r.status == Status::Failed);
+
+	/* HTTP error / offline / TLS: the fetch fails */
+	start = std::chrono::steady_clock::now();
+	r = CtdRunCheck(
+		[](const std::atomic<bool> &, std::string &, std::string &error) {
+			error = "The requested URL returned error: 403";
+			return false;
+		},
+		V("0.10.0"), S, W, limit);
+	CHECK(r.status == Status::Failed && r.error.find("403") != std::string::npos);
+	CHECK(ElapsedMs(start) < limit);
+	r = CtdRunCheck([](const std::atomic<bool> &, std::string &, std::string &) { return false; }, V("0.10.0"), S,
+			W, limit);
+	CHECK(r.status == Status::Failed && !r.error.empty());
+
+	/* an exception in the fetch */
+	r = CtdRunCheck([](const std::atomic<bool> &, std::string &,
+			   std::string &) -> bool { throw std::runtime_error("boom"); },
+			V("0.10.0"), S, W, limit);
+	CHECK(r.status == Status::Failed && r.error.find("boom") != std::string::npos);
+	r = CtdRunCheck(nullptr, V("0.10.0"), S, W, limit);
+	CHECK(r.status == Status::Failed);
+
+	/* timeout: a server that never answers (the fetch honours cancel) */
+	std::atomic<bool> sawCancel{false};
+	int ticks = 0;
+	start = std::chrono::steady_clock::now();
+	r = CtdRunCheck(
+		[&sawCancel](const std::atomic<bool> &cancel, std::string &, std::string &error) {
+			for (int i = 0; i < 1000 && !cancel.load(); i++) {
+				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+			}
+			sawCancel = cancel.load();
+			error = "cancelled";
+			return false;
+		},
+		V("0.10.0"), S, W, shortLimit, [&ticks]() { ticks++; }, 20);
+	const long long waited = ElapsedMs(start);
+	CHECK(r.status == Status::TimedOut);
+	CHECK(waited >= shortLimit - 5 && waited < shortLimit + 1000);
+	CHECK(ticks >= 5); /* the caller kept running (splash painted) while waiting */
+	std::this_thread::sleep_for(std::chrono::milliseconds(200));
+	CHECK(sawCancel.load());
+
+	/* timeout: a fetch stuck where it can't see cancel (e.g. DNS) still doesn't hold the caller */
+	start = std::chrono::steady_clock::now();
+	r = CtdRunCheck(
+		[](const std::atomic<bool> &, std::string &out, std::string &) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(2500));
+			out = "[]";
+			return true;
+		},
+		V("0.10.0"), S, W, shortLimit);
+	CHECK(r.status == Status::TimedOut);
+	CHECK(ElapsedMs(start) < shortLimit + 1000);
+
+	/* a zero limit returns at once */
+	start = std::chrono::steady_clock::now();
+	r = CtdRunCheck(
+		[](const std::atomic<bool> &cancel, std::string &, std::string &) {
+			while (!cancel.load()) {
+				std::this_thread::sleep_for(std::chrono::milliseconds(5));
+			}
+			return false;
+		},
+		V("0.10.0"), S, W, 0);
+	CHECK(r.status == Status::TimedOut && ElapsedMs(start) < 1000);
+
+	CHECK(std::string(CtdCheckStatusName(Status::TimedOut)) == "timed out");
+}
+
+static void TestCache()
+{
+	const long long now = 1800000000;
+	CHECK(CtdUpToDateCacheValid(now, now - 10, "0.10.0", "stable", "0.10.0", "stable"));
+	CHECK(CtdUpToDateCacheValid(now, now - 3599, "0.10.0", "stable", "0.10.0", "stable"));
+	CHECK(!CtdUpToDateCacheValid(now, now - 3600, "0.10.0", "stable", "0.10.0", "stable")); /* an hour old */
+	CHECK(!CtdUpToDateCacheValid(now, 0, "0.10.0", "stable", "0.10.0", "stable"));          /* never checked */
+	CHECK(!CtdUpToDateCacheValid(now, now + 60, "0.10.0", "stable", "0.10.0", "stable"));   /* clock went back */
+	CHECK(!CtdUpToDateCacheValid(now, now - 10, "0.10.0", "stable", "0.10.0", "test"));     /* channel changed */
+	CHECK(!CtdUpToDateCacheValid(now, now - 10, "0.10.0-test.4", "test", "0.10.0-test.5", "test")); /* updated */
+}
+
 int main()
 {
 	TestParseVersion();
@@ -277,6 +406,8 @@ int main()
 	TestParseReleases();
 	TestPickUpdate();
 	TestSha256Sums();
+	TestRunCheck();
+	TestCache();
 	std::printf("%d checks, %d failed\n", checks, failures);
 	return failures == 0 ? 0 : 1;
 }

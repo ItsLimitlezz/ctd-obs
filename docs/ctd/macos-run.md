@@ -9,8 +9,10 @@ Needs macOS 13 or later on an Apple Silicon Mac.
 
 ## 1. Download
 
-Once CTD OBS is installed, **CTD ▸ Check for Updates…** does this step for you: it downloads the new zip to Downloads,
-checks its SHA-256 and shows it in Finder. Continue at item 3 below, then **2. Install**.
+Once CTD OBS is installed, later versions install themselves: CTD OBS checks at launch (and with **CTD ▸ Check for
+Updates…**), then **Download & Install** replaces the app and reopens it ([updates.md](./updates.md)). Sections 1–2 are
+for the first install, or when CTD OBS says it can't replace itself (it then shows the zip in Finder: continue at
+item 3 below).
 
 1. On the Mac open **github.com/ItsLimitlezz/ctd-obs/releases** (no GitHub login needed). Pick the newest release
    (**Latest**), or the newest **Test build** (marked **Pre-release**) if you're testing.
@@ -109,9 +111,9 @@ Not in, or untested:
 
 - **No virtual camera.** On macOS it needs a camera system extension signed with a Developer ID, which CTD doesn't
   have yet. The Start Virtual Camera button isn't shown. (OBS Studio's virtual camera, if installed, is unaffected.)
-- **No automatic replacement**: **CTD ▸ Check for Updates…** downloads and checks a new build, but installing it is
-  sections 1–2 by hand until CTD OBS is notarized ([updates.md](./updates.md)).
-- Not notarized: the `xattr` step is needed for every new build.
+- **Updates** install themselves (download, SHA-256 check, app replaced, reopened; [updates.md](./updates.md)). After an
+  update macOS may ask for the permissions again (step 3.2).
+- Not notarized: the `xattr` step is needed for every build installed by hand (the in-app update does it itself).
 - Builds are never launched on GitHub's Macs (their virtual Macs crash OBS at start for an unrelated graphics reason),
   so **each build's first real launch is on your Mac**.
 

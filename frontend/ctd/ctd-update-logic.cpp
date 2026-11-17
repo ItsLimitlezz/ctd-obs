@@ -13,6 +13,11 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <condition_variable>
+#include <exception>
+#include <mutex>
+#include <thread>
 
 static const char kTagPrefix[] = "ctd-v";
 static const char kTestSuffix[] = "-test.";
@@ -264,4 +269,107 @@ std::map<std::string, std::string> CtdParseSha256Sums(const std::string &text)
 		sums[name] = hash;
 	}
 	return sums;
+}
+
+bool CtdUpToDateCacheValid(long long now, long long cachedAt, const std::string &cachedVersion,
+			   const std::string &cachedChannel, const std::string &version, const std::string &channel)
+{
+	return cachedAt > 0 && now >= cachedAt && now - cachedAt < kCtdUpdateCacheSeconds && cachedVersion == version &&
+	       cachedChannel == channel;
+}
+
+const char *CtdCheckStatusName(CtdCheckResult::Status status)
+{
+	switch (status) {
+	case CtdCheckResult::Status::UpToDate:
+		return "up to date";
+	case CtdCheckResult::Status::UpdateAvailable:
+		return "update available";
+	case CtdCheckResult::Status::Failed:
+		return "failed";
+	case CtdCheckResult::Status::TimedOut:
+		return "timed out";
+	}
+	return "?";
+}
+
+namespace {
+struct CheckState {
+	std::mutex mutex;
+	std::condition_variable done;
+	bool finished = false;
+	std::atomic<bool> cancel{false};
+	CtdCheckResult result;
+};
+} // namespace
+
+CtdCheckResult CtdRunCheck(const CtdFetchReleases &fetch, const CtdVersion &current, CtdUpdateChannel channel,
+			   CtdUpdatePlatform platform, int timeoutMs, const std::function<void()> &tick, int tickMs)
+{
+	auto state = std::make_shared<CheckState>();
+
+	/* detached: on a timeout the caller moves on and the thread finishes (or gives up) on its own; it only touches
+	 * its copies and the shared state */
+	std::thread([state, fetch, current, channel, platform]() {
+		CtdCheckResult result;
+		try {
+			std::string body;
+			std::string error;
+			std::vector<CtdRelease> releases;
+			if (!fetch) {
+				result.error = "no fetch function";
+			} else if (!fetch(state->cancel, body, error)) {
+				result.error = error.empty() ? "request failed" : error;
+			} else if (!CtdParseReleases(body, releases, error)) {
+				result.error = error;
+			} else {
+				result.releaseCount = releases.size();
+				const CtdRelease *update = CtdPickUpdate(releases, current, channel, platform);
+				if (update) {
+					result.status = CtdCheckResult::Status::UpdateAvailable;
+					result.update = *update;
+				} else {
+					result.status = CtdCheckResult::Status::UpToDate;
+				}
+			}
+		} catch (const std::exception &e) {
+			result = CtdCheckResult();
+			result.error = std::string("exception: ") + e.what();
+		} catch (...) {
+			result = CtdCheckResult();
+			result.error = "exception";
+		}
+
+		std::lock_guard<std::mutex> lock(state->mutex);
+		state->result = std::move(result);
+		state->finished = true;
+		state->done.notify_all();
+	}).detach();
+
+	using Clock = std::chrono::steady_clock;
+	const Clock::time_point deadline = Clock::now() + std::chrono::milliseconds(std::max(timeoutMs, 0));
+	const std::chrono::milliseconds step(std::max(tickMs, 1));
+
+	std::unique_lock<std::mutex> lock(state->mutex);
+	while (!state->finished) {
+		const Clock::time_point now = Clock::now();
+		if (now >= deadline) {
+			break;
+		}
+		state->done.wait_until(lock, std::min(deadline, now + step), [&]() { return state->finished; });
+		if (!state->finished && tick) {
+			lock.unlock();
+			tick();
+			lock.lock();
+		}
+	}
+
+	if (!state->finished) {
+		state->cancel.store(true);
+		CtdCheckResult timedOut;
+		timedOut.status = CtdCheckResult::Status::TimedOut;
+		timedOut.error = "no answer within " + std::to_string(timeoutMs) + " ms";
+		return timedOut;
+	}
+	return state->result;
 }

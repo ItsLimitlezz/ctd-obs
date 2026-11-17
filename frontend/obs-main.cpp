@@ -16,6 +16,7 @@
 ******************************************************************************/
 
 #include <OBSApp.hpp>
+#include <ctd/ctd-startup.hpp>
 #include <ctd/ctd-version.hpp>
 
 #include <components/VolumeAccessibleInterface.hpp>
@@ -75,6 +76,8 @@ bool opt_allow_opengl = false;
 bool opt_always_on_top = false;
 bool opt_disable_updater = true; /* CTD OBS: OBS's updater stays off; CTD OBS has its own (frontend/ctd/ctd-update.cpp) */
 bool opt_disable_missing_files_check = false;
+/* CTD OBS: --disable-updater also skips CTD OBS's launch update check (frontend/ctd/ctd-update.cpp) */
+static bool ctd_opt_no_update_check = false;
 string opt_starting_collection;
 string opt_starting_profile;
 string opt_starting_scene;
@@ -685,15 +688,33 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 			blog(LOG_INFO, "Command Line Arguments: %s", stor.str().c_str());
 		}
 
-		if (!program.OBSInit()) {
+		/* CTD OBS: the splash screen, and the update check before anything heavy loads (frontend/ctd/). Automated
+		 * and tray launches get neither; safe mode, --disable-updater and crash recovery skip the check. */
+		const bool ctdUnattended = opt_start_streaming || opt_start_recording || opt_start_replaybuffer ||
+					   opt_start_virtualcam || opt_minimize_tray;
+		const bool ctdSkipUpdateCheck = ctdUnattended || safe_mode || ctd_opt_no_update_check ||
+						program.CtdHadUncleanShutdown();
+		if (!ctdUnattended) {
+			CtdSplashShow();
+		}
+		if (!ctdSkipUpdateCheck && !CtdStartupUpdateCheck()) {
+			/* an update is being installed */
+			CtdSplashFinish();
 			return 0;
 		}
+
+		if (!program.OBSInit()) {
+			CtdSplashFinish();
+			return 0;
+		}
+		CtdSplashFinish();
 
 		prof.Stop();
 
 		ret = program.exec();
 
 	} catch (const char *error) {
+		CtdSplashFinish();
 		blog(LOG_ERROR, "%s", error);
 		OBSErrorBox(nullptr, "%s", error);
 	}
@@ -1019,6 +1040,7 @@ int main(int argc, char *argv[])
 
 		} else if (arg_is(argv[i], "--disable-updater", nullptr)) {
 			opt_disable_updater = true;
+			ctd_opt_no_update_check = true;
 
 		} else if (arg_is(argv[i], "--disable-missing-files-check", nullptr)) {
 			opt_disable_missing_files_check = true;

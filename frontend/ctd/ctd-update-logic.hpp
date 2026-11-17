@@ -14,8 +14,11 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstdint>
+#include <functional>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -39,8 +42,14 @@ int CtdCompareVersions(const CtdVersion &a, const CtdVersion &b);
 
 /* The update settings in user.ini (frontend/ctd/ctd-update.cpp, Settings ▸ CTD ▸ Updates) */
 inline constexpr char kCtdUpdateSection[] = "CTDUpdates";
-inline constexpr char kCtdUpdateKeyAuto[] = "Auto";       /* bool, default true */
-inline constexpr char kCtdUpdateKeyChannel[] = "Channel"; /* "stable" or "test" */
+inline constexpr char kCtdUpdateKeyAuto[] = "Auto";        /* bool, default true */
+inline constexpr char kCtdUpdateKeyChannel[] = "Channel";  /* "stable" or "test" */
+inline constexpr char kCtdUpdateKeySkip[] = "SkipVersion"; /* tag of a release the user skipped */
+/* the last check that found nothing new, reused for an hour so quick relaunches don't ask GitHub again */
+inline constexpr char kCtdUpdateKeyCacheTime[] = "UpToDateAt";
+inline constexpr char kCtdUpdateKeyCacheVersion[] = "UpToDateVersion";
+inline constexpr char kCtdUpdateKeyCacheChannel[] = "UpToDateChannel";
+inline constexpr long long kCtdUpdateCacheSeconds = 60 * 60;
 
 enum class CtdUpdateChannel { Stable, Test };
 enum class CtdUpdatePlatform { Windows, MacOS, Other };
@@ -89,3 +98,32 @@ const CtdRelease *CtdPickUpdate(const std::vector<CtdRelease> &releases, const C
 
 /* sha256sum output: "<64 hex>  <name>" (or "<hex> *<name>") per line -> name: lowercase hex */
 std::map<std::string, std::string> CtdParseSha256Sums(const std::string &text);
+
+/* Whether an earlier "nothing new" answer still holds: less than kCtdUpdateCacheSeconds old, for the same version and
+ * channel (a clock that went backwards counts as stale) */
+bool CtdUpToDateCacheValid(long long now, long long cachedAt, const std::string &cachedVersion,
+			   const std::string &cachedChannel, const std::string &version, const std::string &channel);
+
+/* ---------------------------------------------------------------------------------------------------------------- */
+/* The update check with a hard time limit (the launch check: startup is never held up longer than the limit)       */
+
+/* Fetches the releases JSON into body; false with error on failure. Runs on its own thread; should give up soon after
+ * cancel becomes true (the check doesn't wait for it). */
+using CtdFetchReleases = std::function<bool(const std::atomic<bool> &cancel, std::string &body, std::string &error)>;
+
+struct CtdCheckResult {
+	enum class Status { UpToDate, UpdateAvailable, Failed, TimedOut };
+	Status status = Status::Failed;
+	CtdRelease update; /* UpdateAvailable */
+	size_t releaseCount = 0;
+	std::string error; /* Failed, TimedOut */
+};
+
+const char *CtdCheckStatusName(CtdCheckResult::Status status);
+
+/* Runs fetch on a detached thread and returns within timeoutMs (plus one tick): the result, or TimedOut (the
+ * fetch is then told to cancel and left to finish on its own). Network errors, bad JSON and exceptions are Failed.
+ * tick, if set, runs on the calling thread about every tickMs while waiting (e.g. to keep a splash screen painted). */
+CtdCheckResult CtdRunCheck(const CtdFetchReleases &fetch, const CtdVersion &current, CtdUpdateChannel channel,
+			   CtdUpdatePlatform platform, int timeoutMs, const std::function<void()> &tick = {},
+			   int tickMs = 20);

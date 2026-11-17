@@ -69,6 +69,7 @@ class OBSApp : public QApplication {
 	friend class OBS::NativeEventFilter;
 
 private:
+	bool ctdUncleanShutdown = false;
 	QUuid appLaunchUUID_;
 	std::unique_ptr<OBS::CrashHandler> crashHandler_;
 
@@ -146,6 +147,8 @@ public:
 
 	void AppInit();
 	void checkForUncleanShutdown();
+	/* CTD OBS: the last run didn't shut down cleanly (crash recovery): no launch update check */
+	bool CtdHadUncleanShutdown() const { return ctdUncleanShutdown; }
 	bool OBSInit();
 
 	void UpdateHotkeyFocusSetting(bool reset = true);
