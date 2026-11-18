@@ -48,8 +48,9 @@ test build and `0.10.0` for a stable release. A local build has no channel and c
    again (its anonymous limit is 60 requests an hour per IP address).
 
 No splash and no check for automated launches: `--startstreaming`, `--startrecording`, `--startreplaybuffer`,
-`--startvirtualcam`, `--minimize-to-tray`. No check (the splash still shows) in safe mode, with `--disable-updater` and
-after an unclean shutdown (crash recovery). **Settings ▸ CTD ▸ Updates ▸ Check for updates when CTD OBS starts** turns
+`--startvirtualcam`, `--minimize-to-tray`. No check (the splash still shows) in safe mode, with `--disable-updater`,
+after an unclean shutdown (crash recovery) and in a second instance started while CTD OBS is already running (it
+can't tell whether the first one is live). **Settings ▸ CTD ▸ Updates ▸ Check for updates when CTD OBS starts** turns
 the check off.
 
 ### While running
@@ -63,17 +64,23 @@ closes CTD OBS the normal way (scene collection and settings saved).
 ### Installing
 
 - **Windows**: the installer `CTD-OBS-Setup-<version>-x64.exe` is downloaded to `%TEMP%\ctd-obs-update`, started
-  (Windows asks for administrator rights) and CTD OBS quits. The installer waits for CTD OBS to have exited before it
-  copies files. The temp folder is cleared at the next start.
+  (Windows asks for administrator rights) and CTD OBS quits. The installer waits up to ~30 s for CTD OBS to have
+  exited (then asks to close it) before it copies files. The temp folder is cleared at the next start.
 - **macOS**: `ctd-obs-<version>-macos-arm64.zip` is downloaded, checked, unzipped with `ditto -x -k` and checked again
-  (one app, bundle id `com.cinetechdigital.ctd-obs`, executable present; `codesign --verify` logged). CTD OBS quits and
-  a small helper script (started detached) waits for it to exit, moves the running bundle (normally
-  `/Applications/CTD OBS.app`) aside, copies the new one in its place, strips `com.apple.quarantine`, moves the old one
-  to the Trash and opens the new one. If the copy fails it puts the old app back and opens it. Its log is copied into
-  the next CTD OBS log (`[CTD] Update helper: …`). The dialog warns that macOS may ask for Camera, Microphone and
-  Screen Recording again (each build is signed ad hoc until CTD OBS is notarized).
-  If CTD OBS can't replace itself (the app's folder isn't writable, it runs from App Translocation or not from an app
-  bundle), the zip is moved to Downloads and shown in Finder with the manual steps ([macos-run.md](./macos-run.md)).
+  (one app, bundle id `com.cinetechdigital.ctd-obs`, executable present). **Signature:** once the running CTD OBS is
+  signed with a Developer ID (`docs/ctd/macos-signing.md`), the new app must pass `codesign --verify --deep --strict`
+  and carry the same Team ID, or it isn't swapped in (the manual steps are shown instead); an ad hoc build only logs
+  the `codesign --verify` result. CTD OBS quits and a small helper script (started detached, `/bin/sh` with every path
+  passed as an argument) waits until CTD OBS and anything else running from its bundle has exited. It then copies the
+  new app next to the old one (`.ctd-obs-update-new.app`, the old app untouched while it copies), strips
+  `com.apple.quarantine`, and swaps them with two renames in the same folder (old one to `.ctd-obs-update-old.app`, new
+  one to the app's name), so there is never a half-copied app. The old app goes to the Trash and the new one opens.
+  If any step fails the old app stays (or is put back) and is opened again; if CTD OBS was opened again meanwhile,
+  nothing is changed. Its log is copied into the next CTD OBS log (`[CTD] Update helper: …`). The dialog warns that
+  an ad hoc build may make macOS ask for Camera, Microphone and Screen Recording again (a Developer ID-signed one keeps
+  them). If CTD OBS can't replace itself (the app's folder isn't writable, it runs from App Translocation or not from
+  an app bundle, or the signature check failed), the zip is moved to Downloads and shown in Finder with the manual
+  steps ([macos-run.md](./macos-run.md)).
 - Everything is logged with the `[CTD]` prefix.
 
 ### Testing offline launch
