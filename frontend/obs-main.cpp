@@ -689,11 +689,13 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 		}
 
 		/* CTD OBS: the splash screen, and the update check before anything heavy loads (frontend/ctd/). Automated
-		 * and tray launches get neither; safe mode, --disable-updater and crash recovery skip the check. */
+		 * and tray launches get neither; safe mode, --disable-updater and crash recovery skip the check, and so
+		 * does a second instance (it can't see whether the running one is live, and an install would replace the
+		 * app under it). */
 		const bool ctdUnattended = opt_start_streaming || opt_start_recording || opt_start_replaybuffer ||
 					   opt_start_virtualcam || opt_minimize_tray;
 		const bool ctdSkipUpdateCheck = ctdUnattended || safe_mode || ctd_opt_no_update_check ||
-						program.CtdHadUncleanShutdown();
+						program.CtdHadUncleanShutdown() || already_running;
 		if (!ctdUnattended) {
 			CtdSplashShow();
 		}
