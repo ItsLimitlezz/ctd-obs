@@ -19,7 +19,8 @@
     limited, slow or broken answers: startup goes on, one "[CTD] update
     check:" log line. A "nothing new" answer is reused for an hour. Skipped
     for automated launches (--startstreaming and friends, --minimize-to-tray),
-    safe mode, --disable-updater and after a crash (obs-main.cpp decides).
+    safe mode, --disable-updater, after a crash and in a second instance
+    (obs-main.cpp decides).
     Settings ▸ CTD ▸ Updates turns it off.
 
     While running: CTD ▸ Check for Updates…. Nothing is shown or installed
@@ -88,6 +89,10 @@
 #include <QThread>
 #include <QTimer>
 #include <QVBoxLayout>
+
+#ifdef __APPLE__
+#include <signal.h>
+#endif
 
 #include <atomic>
 #include <ctime>
@@ -406,6 +411,24 @@ static QString CtdRunningBundle()
 	return dir.absolutePath();
 }
 
+/* The bundle's code signing team (Developer ID), empty when it is signed ad hoc or not at all */
+static QString CtdMacTeamId(const QString &bundle)
+{
+	QString out;
+	/* the details go to stderr, which CtdRun merges; an unsigned bundle exits 1 and has no TeamIdentifier line */
+	CtdRun(QStringLiteral("/usr/bin/codesign"), {QStringLiteral("-dv"), QStringLiteral("--verbose=2"), bundle},
+	       &out, 30000);
+	const QString key = QStringLiteral("TeamIdentifier=");
+	for (const QString &line : out.split(QLatin1Char('\n'))) {
+		const QString trimmed = line.trimmed();
+		if (trimmed.startsWith(key)) {
+			const QString team = trimmed.mid(key.size());
+			return team == QStringLiteral("not set") ? QString() : team;
+		}
+	}
+	return QString();
+}
+
 /* Unzips the verified zip into workDir/new and checks it is a CTD OBS app bundle (worker thread) */
 static QString CtdMacUnpack(const QString &zip, const QString &workDir, QString &error)
 {
@@ -443,8 +466,23 @@ static QString CtdMacUnpack(const QString &zip, const QString &workDir, QString 
 		error = QStringLiteral("the app in the zip has no executable");
 		return QString();
 	}
-	if (!CtdRun(QStringLiteral("/usr/bin/codesign"),
-		    {QStringLiteral("--verify"), QStringLiteral("--deep"), QStringLiteral("--strict"), app}, &out)) {
+	const bool signatureValid =
+		CtdRun(QStringLiteral("/usr/bin/codesign"),
+		       {QStringLiteral("--verify"), QStringLiteral("--deep"), QStringLiteral("--strict"), app}, &out);
+	/* The SHA-256 only proves the zip is the one on the release (SHA256SUMS.txt comes from the same place); the
+	 * signature proves who built it. Once this CTD OBS is signed with a Developer ID (docs/ctd/macos-signing.md),
+	 * an update must carry a valid signature from the same team, so no update can swap in an unsigned or foreign
+	 * app (it would also lose the macOS permissions). An ad hoc build can't tell: it only logs the check. */
+	const QString runningTeam = running.isEmpty() ? QString() : CtdMacTeamId(running);
+	if (!runningTeam.isEmpty()) {
+		const QString newTeam = CtdMacTeamId(app);
+		if (!signatureValid || newTeam != runningTeam) {
+			error = QStringLiteral("the new app is not validly signed by team %1 (signature %2, team '%3')")
+					.arg(runningTeam, signatureValid ? QStringLiteral("valid") : out, newTeam);
+			return QString();
+		}
+		blog(LOG_INFO, "[CTD] Update: the new app is signed by team %s, like this one", QT_TO_UTF8(newTeam));
+	} else if (!signatureValid) {
 		/* ad hoc signatures don't always pass --strict: log it, the SHA-256 already matched */
 		blog(LOG_WARNING, "[CTD] Update: codesign --verify on the new app: %s", QT_TO_UTF8(out));
 	}
@@ -679,41 +717,77 @@ static void CtdShowManualSteps(QWidget *parent, const CtdRelease &release, const
 #endif
 
 #ifdef __APPLE__
-/* The helper that swaps the bundle once CTD OBS has quit: arguments pid, new app, target, backup, log */
+/* The helper that swaps the bundle once CTD OBS has quit: arguments pid, new app, target, log.
+ *
+ * The slow part (copying the new app) happens first, beside the target, while the old app is untouched. The swap is
+ * then two renames in the same folder, so there is never a half-copied CTD OBS.app, and the old app is put back if
+ * the second rename fails. Old and new copies live next to the target, never in the work folder (a CTD OBS opened
+ * meanwhile cleans that up, and it keeps it while helper.pid names a running helper). Every path is an argument,
+ * quoted; nothing is evaluated. */
 static const char kMacHelperScript[] = R"sh(#!/bin/sh
 # CTD OBS update helper (frontend/ctd/ctd-update.cpp): waits for CTD OBS to quit, replaces the app bundle, opens it.
-pid="$1"; new_app="$2"; target="$3"; backup="$4"; log="$5"
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+export PATH
+pid="$1"; new_app="$2"; target="$3"; log="$4"
+work="$(dirname "$log")"
+dir="$(dirname "$target")"
+staged="$dir/.ctd-obs-update-new.app"
+backup="$dir/.ctd-obs-update-old.app"
 exec >> "$log" 2>&1
-echo "$(date '+%Y-%m-%d %H:%M:%S') waiting for CTD OBS (pid $pid) to quit"
+echo $$ > "$work/helper.pid"
+say() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*"; }
+done_helper() { rm -f "$work/helper.pid"; exit "$1"; }
+reopen() { rm -f "$work/helper.pid"; open "$target"; exit "$1"; }
+# any process started from inside the bundle (CTD OBS opened again meanwhile, or its helpers still exiting); the path
+# goes to grep through a file so grep's own command line never matches it
+printf '%s\n' "$target/Contents/" > "$work/running.pattern"
+app_running() { ps -A -o args= | grep -q -F -f "$work/running.pattern"; }
+
+say "waiting for CTD OBS (pid $pid) to quit"
 n=0
-while kill -0 "$pid" 2> /dev/null; do
+while kill -0 "$pid" 2> /dev/null || app_running; do
   n=$((n + 1))
   if [ "$n" -gt 1200 ]; then
-    echo "CTD OBS still running after 10 minutes: nothing changed"
-    exit 1
+    say "CTD OBS still running after 10 minutes: nothing changed"
+    done_helper 1
   fi
   sleep 0.5
 done
-rm -rf "$backup"
+
+rm -rf "$staged" "$backup"
+if ! ditto "$new_app" "$staged"; then
+  say "could not copy the new app next to $target: nothing changed"
+  rm -rf "$staged"
+  reopen 1
+fi
+xattr -dr com.apple.quarantine "$staged" 2> /dev/null
+if app_running; then
+  say "CTD OBS was opened again during the update: nothing changed"
+  rm -rf "$staged"
+  done_helper 1
+fi
 if ! mv "$target" "$backup"; then
-  echo "could not move the old app aside: nothing changed"
-  open "$target"
-  exit 1
+  say "could not move the old app aside: nothing changed"
+  rm -rf "$staged"
+  reopen 1
 fi
-if ditto "$new_app" "$target"; then
-  xattr -dr com.apple.quarantine "$target" 2> /dev/null
-  echo "installed $target"
-  trash="$HOME/.Trash/CTD OBS (before update $(date '+%Y-%m-%d %H.%M.%S')).app"
-  mv "$backup" "$trash" 2> /dev/null && echo "old app moved to the Trash" || echo "old app kept at $backup"
-  rm -rf "$new_app"
-  open "$target"
+if ! mv "$staged" "$target"; then
+  say "could not move the new app into place: putting the old app back"
+  if mv "$backup" "$target"; then say "old app restored"; else say "old app is at $backup"; fi
+  rm -rf "$staged"
+  reopen 1
+fi
+say "installed $target"
+trash="$HOME/.Trash/CTD OBS (before update $(date '+%Y-%m-%d %H.%M.%S')).app"
+if mv "$backup" "$trash" 2> /dev/null; then
+  say "old app moved to the Trash"
+elif rm -rf "$backup"; then
+  say "old app removed"
 else
-  echo "copy failed: putting the old app back"
-  rm -rf "$target"
-  mv "$backup" "$target" && echo "old app restored"
-  open "$target"
-  exit 1
+  say "old app left at $backup"
 fi
+rm -rf "$new_app"
+reopen 0
 )sh";
 
 /* Whether CTD OBS can replace its own bundle; why not in reason */
@@ -749,9 +823,8 @@ static bool CtdMacStartHelper(const QString &newApp, const QString &target, QStr
 	}
 	file.close();
 
-	const QStringList args = {
-		script, QString::number(QCoreApplication::applicationPid()), newApp,
-		target, workDir + QStringLiteral("/CTD OBS (previous).app"), workDir + QStringLiteral("/update.log")};
+	const QStringList args = {script, QString::number(QCoreApplication::applicationPid()), newApp, target,
+				  workDir + QStringLiteral("/update.log")};
 	if (!QProcess::startDetached(QStringLiteral("/bin/sh"), args)) {
 		error = QStringLiteral("could not start /bin/sh");
 		return false;
@@ -856,6 +929,19 @@ static void CtdUpdateCleanup()
 	if (!dir.exists()) {
 		return;
 	}
+#ifdef __APPLE__
+	/* CTD OBS opened again while the macOS helper is still swapping the app: leave its files (and log) for later */
+	QFile helperPid(dir.filePath(QStringLiteral("helper.pid")));
+	if (helperPid.open(QIODevice::ReadOnly)) {
+		bool ok = false;
+		const long long pid = helperPid.readAll().trimmed().toLongLong(&ok);
+		helperPid.close();
+		if (ok && pid > 0 && ::kill(static_cast<pid_t>(pid), 0) == 0) {
+			blog(LOG_INFO, "[CTD] Update helper (pid %lld) is still running: its files are kept", pid);
+			return;
+		}
+	}
+#endif
 	QFile log(dir.filePath(QStringLiteral("update.log")));
 	if (log.open(QIODevice::ReadOnly)) {
 		for (const QByteArray &line : log.readAll().split('\n')) {
