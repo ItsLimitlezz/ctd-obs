@@ -1,9 +1,12 @@
 # Running CTD OBS on a Mac (Apple Silicon)
 
 CTD OBS for Apple Silicon Macs (M1 and later) is published on the repository's GitHub Releases: a test build for every
-push to `ctd/main`, stable releases once they pass the SR check ([updates.md](./updates.md)). The builds are **signed ad
-hoc, not notarized** (there is no Developer ID yet), so macOS needs one Terminal command before the first launch. CTD OBS runs **beside OBS Studio**: its own app, its own settings
-folder (`~/Library/Application Support/ctd-obs`), its own permissions. Nothing of OBS Studio's is read or changed.
+push to `ctd/main`, stable releases once they pass the SR check ([updates.md](./updates.md)). Once CTD's signing secrets
+are set the builds are **signed with CineTech Digital's Developer ID and notarized by Apple**
+(`docs/ctd/macos-signing.md`): they install like any Mac app. Until then they are **signed ad hoc, not notarized** (the
+build run's summary says which), and an ad hoc build needs one Terminal command before the first launch (step 2.3). CTD
+OBS runs **beside OBS Studio**: its own app, its own settings folder (`~/Library/Application Support/ctd-obs`), its own
+permissions. Nothing of OBS Studio's is read or changed.
 
 Needs macOS 13 or later on an Apple Silicon Mac.
 
@@ -23,35 +26,41 @@ item 3 below).
    links and permissions.
 
    A build for a branch other than `ctd/main` is only on GitHub Actions (sign in, **Actions → CTD OBS**, the run, under
-   **Artifacts** `ctd-obs-macos-arm64-<commit>`). That download is a zip **inside** a zip: double-click both.
+   **Artifacts** `ctd-obs-macos-arm64-<commit>`; `…-intel-host` is the same Apple Silicon app built on an Intel runner).
+   That download is a zip **inside** a zip: double-click both. A signed build's artifact also holds a disk image
+   (`ctd-obs-<version>-<commit>-macos-arm64.dmg`): open it and drag **CTD OBS** onto **Applications** instead.
 
 ## 2. Install
 
 1. Quit CTD OBS if an older test build is running.
 2. Drag **CTD OBS** into **Applications** (replace the old one if asked).
-3. Open **Terminal** and run:
+3. **Only for an ad hoc build** (summary says "ad hoc, not notarized"): open **Terminal** and run:
 
    ```sh
    xattr -dr com.apple.quarantine "/Applications/CTD OBS.app"
    ```
 
    This removes the "downloaded from the internet" mark. Without it macOS says the app "is damaged and can't be opened"
-   (that only means it isn't notarized).
+   (that only means it isn't notarized). A signed, notarized build needs none of this.
 
 ## 3. First launch
 
-1. In Applications, **right-click CTD OBS → Open**, then **Open** in the dialog. Later launches are a normal
-   double-click.
-   - If macOS still refuses: **System Settings → Privacy & Security**, scroll down, **Open Anyway** next to CTD OBS.
+1. In Applications, double-click **CTD OBS**. A signed build asks once whether to open an app downloaded from the
+   internet: **Open**. An ad hoc build: **right-click CTD OBS → Open**, then **Open** in the dialog; later launches are
+   a normal double-click.
+   - If macOS still refuses an ad hoc build: **System Settings → Privacy & Security**, scroll down, **Open Anyway**
+     next to CTD OBS.
 2. CTD OBS asks for permissions in its own window. Grant, for **CTD OBS**:
    - **Camera** (camera sources) and **Microphone** (audio inputs): allow in the prompt.
    - **Screen & System Audio Recording** (display/window capture): opens System Settings; switch **CTD OBS** on, then
      **quit and reopen CTD OBS** (macOS applies it only on restart).
    - **Accessibility** is only for global hotkeys; skip it unless you use them.
 
-   OBS Studio's permissions don't carry over: CTD OBS is a separate app (`com.cinetechdigital.ctd-obs`). A **new test
-   build may ask again** (ad hoc signatures change per build); if a source is black after an update, switch CTD OBS off
-   and on again in that Privacy & Security list, then restart CTD OBS.
+   OBS Studio's permissions don't carry over: CTD OBS is a separate app (`com.cinetechdigital.ctd-obs`). **Signed
+   builds keep these permissions across updates** (they belong to CTD's Developer ID and the bundle id). An **ad hoc
+   build may ask again** after each update (its signature changes per build); if a source is black after an update,
+   switch CTD OBS off and on again in that Privacy & Security list, then restart CTD OBS. Going from an ad hoc build to
+   the first signed one counts as a change, so it may ask once more then.
 3. **Welcome to CTD OBS** appears on the first run: choose **Later** for now if you're importing your OBS setup first
    (step 4), or **Pair with CTD Relay** to go straight to step 5.
 
@@ -109,11 +118,13 @@ Settings ▸ CTD, CTD Night theme, browser sources, WebSocket server.
 
 Not in, or untested:
 
-- **No virtual camera.** On macOS it needs a camera system extension signed with a Developer ID, which CTD doesn't
-  have yet. The Start Virtual Camera button isn't shown. (OBS Studio's virtual camera, if installed, is unaffected.)
-- **Updates** install themselves (download, SHA-256 check, app replaced, reopened; [updates.md](./updates.md)). After an
-  update macOS may ask for the permissions again (step 3.2).
-- Not notarized: the `xattr` step is needed for every build installed by hand (the in-app update does it itself).
+- **No virtual camera.** On macOS it needs a camera system extension with its own Developer ID provisioning profile
+  (what's needed: `docs/ctd/macos-signing.md`). The Start Virtual Camera button isn't shown. (OBS Studio's virtual
+  camera, if installed, is unaffected.)
+- **Updates** install themselves (download, SHA-256 check, app replaced, reopened; [updates.md](./updates.md)). An ad hoc
+  build may ask for the permissions again after an update (step 3.2); a signed one keeps them.
+- Ad hoc builds (no signing secrets, e.g. from a fork) aren't notarized: the `xattr` step is needed for every build
+  installed by hand (the in-app update does it itself).
 - Builds are never launched on GitHub's Macs (their virtual Macs crash OBS at start for an unrelated graphics reason),
   so **each build's first real launch is on your Mac**.
 

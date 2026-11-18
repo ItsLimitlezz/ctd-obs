@@ -106,6 +106,17 @@ jobs:
     with:
       channel: ${{ needs.setup.outputs.channel }}
       testNumber: ${{ needs.setup.outputs.testNumber }}
+    # Developer ID signing + notarization (docs/ctd/macos-signing.md): a called workflow gets no secrets otherwise and
+    # would always build ad hoc. Signing and the notarized re-zip happen inside the macOS job, so the zip the Release job
+    # publishes and hashes into SHA256SUMS.txt is the signed one.
+    secrets:
+      MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+      MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+      NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+      NOTARY_KEY_P8_BASE64: ${{ secrets.NOTARY_KEY_P8_BASE64 }}
 
   release:
     name: Release
