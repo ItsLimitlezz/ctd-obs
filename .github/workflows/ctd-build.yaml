@@ -128,8 +128,13 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+    # A concurrency group holds one running and one pending job; a newer pending job replaces the older one whatever
+    # cancel-in-progress says. So each kind gets its own group: test builds publish one at a time (a newer pending
+    # test build may replace an older pending one, which it supersedes anyway), a stable draft can never be replaced
+    # by a test build or a dry run, and dry runs (nothing published) don't queue at all. Test pruning only touches
+    # ctd-v<X.Y.Z>-test.<N> releases, so a test and a stable job may run side by side.
     concurrency:
-      group: ctd-obs-release
+      group: ctd-obs-release-${{ needs.setup.outputs.publish || format('dry-run-{0}', github.run_id) }}
       cancel-in-progress: false
     env:
       GH_TOKEN: ${{ github.token }}
