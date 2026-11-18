@@ -1,28 +1,34 @@
 # Running CTD OBS on a Mac (Apple Silicon)
 
-Test builds of CTD OBS for Apple Silicon Macs (M1 and later) come from GitHub Actions (`.github/workflows/ctd-macos.yaml`,
-every push to a `ctd/**` branch). Once CTD's signing secrets are set they are **signed with CineTech Digital's Developer
-ID and notarized by Apple** (`docs/ctd/macos-signing.md`): they install like any Mac app. The run's summary says
-**Developer ID, notarized** or **ad hoc, not notarized**; an ad hoc build needs one Terminal command before the first
-launch (step 2.3). CTD OBS runs **beside OBS Studio**: its own app, its own settings folder
-(`~/Library/Application Support/ctd-obs`), its own permissions. Nothing of OBS Studio's is read or changed.
+CTD OBS for Apple Silicon Macs (M1 and later) is published on the repository's GitHub Releases: a test build for every
+push to `ctd/main`, stable releases once they pass the SR check ([updates.md](./updates.md)). Once CTD's signing secrets
+are set the builds are **signed with CineTech Digital's Developer ID and notarized by Apple**
+(`docs/ctd/macos-signing.md`): they install like any Mac app. Until then they are **signed ad hoc, not notarized** (the
+build run's summary says which), and an ad hoc build needs one Terminal command before the first launch (step 2.3). CTD
+OBS runs **beside OBS Studio**: its own app, its own settings folder (`~/Library/Application Support/ctd-obs`), its own
+permissions. Nothing of OBS Studio's is read or changed.
 
 Needs macOS 13 or later on an Apple Silicon Mac.
 
 ## 1. Download
 
-1. On the Mac, sign in to GitHub and open the build: **github.com/ItsLimitlezz/ctd-obs → Actions → CTD OBS macOS**, then
-   the run for the commit you want (green tick).
-2. At the bottom of the run page, under **Artifacts**, click **`ctd-obs-macos-arm64-<commit>`**. A `.zip` downloads.
-   A signed build also has a disk image in it (`ctd-obs-<version>-<commit>-macos-arm64.dmg`): you can open that instead
-   of the inner zip in step 3 and drag **CTD OBS** onto **Applications** in its window.
-   `ctd-obs-macos-arm64-<commit>-intel-host` is the same Apple Silicon app, built on an Intel runner when GitHub has no
-   Apple Silicon runner free; either one is fine.
-3. In Downloads, double-click the zip (Safari may already have opened it into a folder). Inside is a second zip,
-   `ctd-obs-<version>-<commit>-macos-arm64.zip`: double-click it too. You get **CTD OBS** (`CTD OBS.app`).
+Once CTD OBS is installed, later versions install themselves: CTD OBS checks at launch (and with **CTD ▸ Check for
+Updates…**), then **Download & Install** replaces the app and reopens it ([updates.md](./updates.md)). Sections 1–2 are
+for the first install, or when CTD OBS says it can't replace itself (it then shows the zip in Finder: continue at
+item 3 below).
 
-   The inner zip is on purpose: it keeps the app's internal links and permissions, which GitHub's own zip would break.
-   Always unzip with Finder (Archive Utility), not a third-party unzipper.
+1. On the Mac open **github.com/ItsLimitlezz/ctd-obs/releases** (no GitHub login needed). Pick the newest release
+   (**Latest**), or the newest **Test build** (marked **Pre-release**) if you're testing.
+2. Under **Assets**, click **`ctd-obs-<version>-macos-arm64.zip`**. It downloads to Downloads. (`SHA256SUMS.txt` next to
+   it holds the checksums: `shasum -a 256 ~/Downloads/ctd-obs-*-macos-arm64.zip` must print the same.)
+3. In Downloads, double-click the zip (Safari may already have opened it into a folder). You get **CTD OBS**
+   (`CTD OBS.app`). Always unzip with Finder (Archive Utility), not a third-party unzipper: it keeps the app's internal
+   links and permissions.
+
+   A build for a branch other than `ctd/main` is only on GitHub Actions (sign in, **Actions → CTD OBS**, the run, under
+   **Artifacts** `ctd-obs-macos-arm64-<commit>`; `…-intel-host` is the same Apple Silicon app built on an Intel runner).
+   That download is a zip **inside** a zip: double-click both. A signed build's artifact also holds a disk image
+   (`ctd-obs-<version>-<commit>-macos-arm64.dmg`): open it and drag **CTD OBS** onto **Applications** instead.
 
 ## 2. Install
 
@@ -115,8 +121,10 @@ Not in, or untested:
 - **No virtual camera.** On macOS it needs a camera system extension with its own Developer ID provisioning profile
   (what's needed: `docs/ctd/macos-signing.md`). The Start Virtual Camera button isn't shown. (OBS Studio's virtual
   camera, if installed, is unaffected.)
-- **No auto-update** (same as Windows): install each test build by hand, steps 1–2.
-- Ad hoc builds (no signing secrets, e.g. from a fork) aren't notarized: the `xattr` step is needed for every new one.
+- **Updates** install themselves (download, SHA-256 check, app replaced, reopened; [updates.md](./updates.md)). An ad hoc
+  build may ask for the permissions again after an update (step 3.2); a signed one keeps them.
+- Ad hoc builds (no signing secrets, e.g. from a fork) aren't notarized: the `xattr` step is needed for every build
+  installed by hand (the in-app update does it itself).
 - Builds are never launched on GitHub's Macs (their virtual Macs crash OBS at start for an unrelated graphics reason),
   so **each build's first real launch is on your Mac**.
 

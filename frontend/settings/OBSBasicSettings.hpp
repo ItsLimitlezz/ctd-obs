@@ -144,7 +144,7 @@ private:
 	inline bool Changed() const
 	{
 		return generalChanged || appearanceChanged || outputsChanged || stream1Changed || audioChanged ||
-		       videoChanged || advancedChanged || hotkeysChanged || a11yChanged;
+		       videoChanged || advancedChanged || hotkeysChanged || a11yChanged || ctdChanged;
 	}
 
 	inline void EnableApplyButton(bool en) { ui->buttonBox->button(QDialogButtonBox::Apply)->setEnabled(en); }
@@ -160,6 +160,7 @@ private:
 		a11yChanged = false;
 		advancedChanged = false;
 		appearanceChanged = false;
+		ctdChanged = false;
 		EnableApplyButton(false);
 	}
 
@@ -228,7 +229,11 @@ private:
 
 	/* CTD OBS: the Settings ▸ CTD page (frontend/ctd/ctd-settings-page.cpp) */
 	int ctdPageRow = -1;
+	bool ctdChanged = false;
+	QCheckBox *ctdUpdateAuto = nullptr;
+	QComboBox *ctdUpdateChannel = nullptr;
 	void CtdInitPage();
+	void CtdSaveSettings();
 
 public:
 	void CtdShowPage();

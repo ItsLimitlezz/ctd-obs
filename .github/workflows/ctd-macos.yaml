@@ -1,11 +1,35 @@
 name: CTD OBS macOS
 run-name: ${{ github.ref_name }} macOS build
+# Pushes to ctd/** and ctd-v* tags run this through .github/workflows/ctd-build.yaml (CTD OBS), which also publishes
+# GitHub Releases (docs/ctd/updates.md). workflow_dispatch builds it on its own (no channel: like a local build).
 on:
-  push:
-    paths-ignore:
-      - '**.md'
-    branches:
-      - 'ctd/**'
+  workflow_call:
+    inputs:
+      channel:
+        description: 'Update channel compiled in: stable, test or empty (frontend/cmake/ctd-version.cmake)'
+        type: string
+        default: ''
+      testNumber:
+        description: 'Test build number N of ctd-v<X.Y.Z>-test.<N> (channel test only)'
+        type: string
+        default: ''
+    # A called workflow sees no secrets unless the caller passes them (ctd-build.yaml does). All optional: without
+    # MACOS_CERT_P12_BASE64 the build stays ad hoc signed (docs/ctd/macos-signing.md).
+    secrets:
+      MACOS_CERT_P12_BASE64:
+        required: false
+      MACOS_CERT_PASSWORD:
+        required: false
+      MACOS_KEYCHAIN_PASSWORD:
+        required: false
+      APPLE_TEAM_ID:
+        required: false
+      NOTARY_KEY_ID:
+        required: false
+      NOTARY_ISSUER_ID:
+        required: false
+      NOTARY_KEY_P8_BASE64:
+        required: false
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,6 +49,9 @@ jobs:
           - host: macos-26-intel
             artifactSuffix: '-intel-host'
     runs-on: ${{ matrix.host }}
+    env:
+      CTD_OBS_CHANNEL: ${{ inputs.channel }}
+      CTD_OBS_TEST_NUMBER: ${{ inputs.testNumber }}
     defaults:
       run:
         shell: zsh --no-rcs --errexit --pipefail {0}

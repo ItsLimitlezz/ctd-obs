@@ -87,7 +87,7 @@ Mac. Don't send them over chat or email, and never commit them.
 ### 5. Check it
 
 1. github.com/ItsLimitlezz/ctd-obs → **Actions** → **CTD OBS macOS** → **Run workflow** on `ctd/main` (or push to a
-   `ctd/**` branch).
+   `ctd/**` branch: the **CTD OBS** run's macOS jobs, which also feed the release zip).
 2. The run's summary says **macOS signing: Developer ID, notarized** with **Accepted** for the app and the disk image.
    The artifact now holds the zip and a `.dmg`.
 3. On a Mac, after installing: `spctl -a -vvv "/Applications/CTD OBS.app"` prints `accepted` and

@@ -1,0 +1,254 @@
+name: CTD OBS
+run-name: ${{ github.ref_name }} build
+# Builds CTD OBS for Windows and macOS (ctd-windows.yaml, ctd-macos.yaml), runs the unit tests and turns the result
+# into a GitHub Release (docs/ctd/updates.md):
+#
+#   push to ctd/main      prerelease "Test build" ctd-v<CTD-VERSION>-test.<run number>; the newest 10 are kept
+#   tag ctd-v<X.Y.Z>      draft release ctd-v<X.Y.Z>; the Head publishes it after the SR check
+#   any other ctd/** push dry run: the release payload (names, SHA256SUMS.txt, notes) is built but not published
+#
+# The test number is this workflow's run number: never rename this file (the numbers would start again at 1 and
+# older test builds would look newer). Tags are ctd-v*, never a bare 0.10.0 (that clashes with OBS's own tags).
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+    branches:
+      - 'ctd/**'
+    tags:
+      - 'ctd-v*'
+      - '!ctd-v*-*'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  setup:
+    name: Release info
+    runs-on: ubuntu-24.04
+    outputs:
+      channel: ${{ steps.info.outputs.channel }}
+      testNumber: ${{ steps.info.outputs.testNumber }}
+      releaseVersion: ${{ steps.info.outputs.releaseVersion }}
+      tag: ${{ steps.info.outputs.tag }}
+      publish: ${{ steps.info.outputs.publish }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Release info
+        id: info
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          REF: ${{ github.ref }}
+          EVENT: ${{ github.event_name }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          ctd_version="$(head -n 1 CTD-VERSION | tr -cd '0-9.')"
+          if [[ ! ${ctd_version} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::CTD-VERSION must hold <MAJOR>.<MINOR>.<PATCH>, not '${ctd_version}'"
+            exit 1
+          fi
+
+          if [[ ${REF_TYPE} == tag ]]; then
+            if [[ ${REF_NAME} != "ctd-v${ctd_version}" ]]; then
+              echo "::error::Tag ${REF_NAME} doesn't match CTD-VERSION ${ctd_version}: tag ctd-v${ctd_version}, or change CTD-VERSION first"
+              exit 1
+            fi
+            channel=stable
+            test_number=''
+            release_version="${ctd_version}"
+            publish=stable
+          else
+            channel=test
+            test_number="${RUN_NUMBER}"
+            release_version="${ctd_version}-test.${test_number}"
+            publish=''
+            if [[ ${REF} == refs/heads/ctd/main && ${EVENT} == push ]]; then
+              publish=test
+            fi
+          fi
+
+          {
+            echo "channel=${channel}"
+            echo "testNumber=${test_number}"
+            echo "releaseVersion=${release_version}"
+            echo "tag=ctd-v${release_version}"
+            echo "publish=${publish}"
+          } >> "${GITHUB_OUTPUT}"
+          echo "CTD OBS ${release_version}: channel ${channel}, release tag ctd-v${release_version}, publish '${publish:-no (dry run)}'" >> "${GITHUB_STEP_SUMMARY}"
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Update check tests
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q nlohmann-json3-dev
+          cmake -S test/ctd-update -B build_ctd_update_test
+          cmake --build build_ctd_update_test
+          ctest --test-dir build_ctd_update_test --output-on-failure
+
+  windows:
+    name: Windows
+    needs: setup
+    uses: ./.github/workflows/ctd-windows.yaml
+    with:
+      channel: ${{ needs.setup.outputs.channel }}
+      testNumber: ${{ needs.setup.outputs.testNumber }}
+
+  macos:
+    name: macOS
+    needs: setup
+    uses: ./.github/workflows/ctd-macos.yaml
+    with:
+      channel: ${{ needs.setup.outputs.channel }}
+      testNumber: ${{ needs.setup.outputs.testNumber }}
+    # Developer ID signing + notarization (docs/ctd/macos-signing.md): a called workflow gets no secrets otherwise and
+    # would always build ad hoc. Signing and the notarized re-zip happen inside the macOS job, so the zip the Release job
+    # publishes and hashes into SHA256SUMS.txt is the signed one.
+    secrets:
+      MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+      MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+      NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+      NOTARY_KEY_P8_BASE64: ${{ secrets.NOTARY_KEY_P8_BASE64 }}
+
+  release:
+    name: Release
+    needs: [setup, unit-tests, windows, macos]
+    # macOS builds twice (two hosts, ctd-macos.yaml); one good build is enough
+    if: >-
+      !cancelled() && needs.setup.result == 'success' && needs.unit-tests.result == 'success' &&
+      needs.windows.result == 'success' && (needs.macos.result == 'success' || needs.macos.result == 'failure')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    # A concurrency group holds one running and one pending job; a newer pending job replaces the older one whatever
+    # cancel-in-progress says. So each kind gets its own group: test builds publish one at a time (a newer pending
+    # test build may replace an older pending one, which it supersedes anyway), a stable draft can never be replaced
+    # by a test build or a dry run, and dry runs (nothing published) don't queue at all. Test pruning only touches
+    # ctd-v<X.Y.Z>-test.<N> releases, so a test and a stable job may run side by side.
+    concurrency:
+      group: ctd-obs-release-${{ needs.setup.outputs.publish || format('dry-run-{0}', github.run_id) }}
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      RELEASE_VERSION: ${{ needs.setup.outputs.releaseVersion }}
+      TAG: ${{ needs.setup.outputs.tag }}
+      PUBLISH: ${{ needs.setup.outputs.publish }}
+      SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: ctd-obs-*-${{ github.sha }}*
+          path: artifacts
+
+      - name: Release payload
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          mkdir -p payload
+
+          # exactly one file per glob, copied under its release name
+          take() {
+            local name=$1; shift
+            local -a found=("$@")
+            if (( ${#found[@]} != 1 )); then
+              echo "::error::${name}: expected one file, found ${#found[@]}: ${found[*]}"
+              exit 1
+            fi
+            cp "${found[0]}" "payload/${name}"
+          }
+
+          take "CTD-OBS-Setup-${RELEASE_VERSION}-x64.exe" artifacts/ctd-obs-setup-windows-x64-${SHA}/CTD-OBS-Setup-*-x64.exe
+          take "ctd-obs-${RELEASE_VERSION}-windows-x64.zip" artifacts/ctd-obs-windows-x64-${SHA}/ctd-obs-*-windows-x64.zip
+
+          # the native Apple Silicon build if there is one, else the one cross-compiled on the Intel host
+          mac=(artifacts/ctd-obs-macos-arm64-${SHA}/ctd-obs-*-macos-arm64.zip)
+          if (( ${#mac[@]} == 0 )); then
+            mac=(artifacts/ctd-obs-macos-arm64-${SHA}-intel-host/ctd-obs-*-macos-arm64.zip)
+          fi
+          take "ctd-obs-${RELEASE_VERSION}-macos-arm64.zip" "${mac[@]}"
+
+          (cd payload && sha256sum -- * > SHA256SUMS.txt)
+
+          subject="$(git log -1 --format=%s "${SHA}")"
+          if [[ ${PUBLISH} == stable ]]; then
+            {
+              echo "CTD OBS ${RELEASE_VERSION}."
+              echo
+              echo "_Release notes: write them here before publishing._"
+            } > notes.md
+          else
+            {
+              echo "Test build from \`ctd/main\` at ${SHA:0:7}: ${subject}"
+              echo
+              echo "Windows: run \`CTD-OBS-Setup-${RELEASE_VERSION}-x64.exe\`. macOS (Apple Silicon): see docs/ctd/macos-run.md."
+            } > notes.md
+          fi
+
+          {
+            echo "### Release payload ${TAG}"
+            echo '```'
+            ls -l payload
+            echo
+            cat payload/SHA256SUMS.txt
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      # The binaries are already this run's build artifacts; this keeps what the release would hold
+      - name: Upload release manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ctd-obs-release-manifest-${{ github.sha }}
+          path: |
+            payload/SHA256SUMS.txt
+            notes.md
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Publish test build
+        if: env.PUBLISH == 'test'
+        run: |
+          set -euo pipefail
+          if gh release view "${TAG}" --repo "${REPO}" > /dev/null 2>&1; then
+            echo "${TAG} exists (re-run): replacing its assets"
+            gh release upload "${TAG}" payload/* --repo "${REPO}" --clobber
+          else
+            gh release create "${TAG}" payload/* --repo "${REPO}" --target "${SHA}" --prerelease \
+              --title "Test build ${RELEASE_VERSION}" --notes-file notes.md
+          fi
+
+          # keep the newest 10 test builds (the run number grows, so the highest test numbers are the newest)
+          gh api --paginate "repos/${REPO}/releases?per_page=100" \
+            --jq '.[] | select(.prerelease and (.tag_name | test("^ctd-v[0-9]+\\.[0-9]+\\.[0-9]+-test\\.[0-9]+$"))) | .tag_name' \
+            | awk -F. '{ print $NF "\t" $0 }' | sort -k1,1nr | cut -f2 | tail -n +11 \
+            | while read -r old; do
+                echo "Deleting old test build ${old}"
+                gh release delete "${old}" --repo "${REPO}" --yes --cleanup-tag
+              done
+
+      - name: Draft stable release
+        if: env.PUBLISH == 'stable'
+        run: |
+          set -euo pipefail
+          if is_draft="$(gh release view "${TAG}" --repo "${REPO}" --json isDraft --jq .isDraft 2> /dev/null)"; then
+            if [[ ${is_draft} != true ]]; then
+              echo "::error::${TAG} is already published; not replacing its assets"
+              exit 1
+            fi
+            echo "Draft ${TAG} exists (re-run): replacing its assets"
+            gh release upload "${TAG}" payload/* --repo "${REPO}" --clobber
+          else
+            gh release create "${TAG}" payload/* --repo "${REPO}" --verify-tag --draft \
+              --title "CTD OBS ${RELEASE_VERSION}" --notes-file notes.md
+          fi
+          echo "Draft release ${TAG} is ready: the Head publishes it after the SR check." >> "${GITHUB_STEP_SUMMARY}"

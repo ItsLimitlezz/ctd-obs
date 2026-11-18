@@ -48,6 +48,7 @@
 extern volatile bool recording_paused;
 
 class ColorSelect;
+class CtdUpdater;
 class OBSAbout;
 class OBSBasicAdvAudio;
 class OBSBasicFilters;
@@ -1736,6 +1737,18 @@ private:
 public:
 	void CtdOpenSettings();
 	bool ctdSettingsOpenOnCtdPage = false;
+
+	/* -------------------------------------
+	 * MARK: - CTD updates (frontend/ctd/ctd-update.cpp)
+	 * -------------------------------------
+	 */
+private:
+	CtdUpdater *ctdUpdater = nullptr;
+
+	void CtdUpdateInit();
+
+public:
+	void CtdCheckForUpdates();
 
 public:
 #ifdef YOUTUBE_ENABLED

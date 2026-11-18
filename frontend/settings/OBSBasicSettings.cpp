@@ -3786,6 +3786,9 @@ void OBSBasicSettings::SaveSettings()
 	if (appearanceChanged) {
 		SaveAppearanceSettings();
 	}
+	if (ctdChanged) {
+		CtdSaveSettings();
+	}
 	if (videoChanged || advancedChanged) {
 		main->ResetVideo();
 	}
@@ -3822,6 +3825,9 @@ void OBSBasicSettings::SaveSettings()
 		}
 		if (advancedChanged) {
 			AddChangedVal(changed, "advanced");
+		}
+		if (ctdChanged) {
+			AddChangedVal(changed, "ctd");
 		}
 
 		blog(LOG_INFO, "Settings changed (%s)", changed.c_str());

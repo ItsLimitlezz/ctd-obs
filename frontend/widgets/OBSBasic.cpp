@@ -25,6 +25,7 @@
 #include "OBSBasicStats.hpp"
 #include "plugin-manager/PluginManager.hpp"
 
+#include <ctd/ctd-startup.hpp>
 #include <ctd/ctd-version.hpp>
 
 #include <obs-module.h>
@@ -930,7 +931,9 @@ void OBSBasic::OBSInit()
 
 	CtdShowRegisterProcs();
 	CtdMenuInit();
+	CtdUpdateInit();
 
+	CtdSplashSetStage(CtdSplashStage::Plugins);
 	App()->loadAppModules();
 
 #ifdef BROWSER_AVAILABLE
@@ -992,6 +995,7 @@ void OBSBasic::OBSInit()
 	}
 	UpdateEditMenu();
 
+	CtdSplashSetStage(CtdSplashStage::Scenes);
 	{
 		ProfileScope("OBSBasic::Load");
 		const std::string sceneCollectionName{
@@ -1049,6 +1053,8 @@ void OBSBasic::OBSInit()
 	bool sysTrayWhenStarted = config_get_bool(App()->GetUserConfig(), "BasicWindow", "SysTrayWhenStarted");
 	bool hideWindowOnStart = QSystemTrayIcon::isSystemTrayAvailable() && sysTrayEnabled &&
 				 (opt_minimize_tray || sysTrayWhenStarted);
+
+	CtdSplashSetStage(CtdSplashStage::Starting);
 
 #ifdef _WIN32
 	SetWin32DropStyle(this);
@@ -1256,6 +1262,9 @@ void OBSBasic::OBSInit()
 
 	UpdatePreviewProgramIndicators();
 	OnFirstLoad();
+
+	/* CTD OBS: the main window is up */
+	CtdSplashFinish();
 
 	if (!hideWindowOnStart) {
 		activateWindow();

@@ -4,6 +4,8 @@
       CTD Relay + CTD Hub   the CTD plugin's section (connection, pairing,
                             profile, WebSocket sharing, Hub servers)
       Vertical              the vertical canvas's own settings window
+      Updates               check for updates automatically, update channel
+                            (frontend/ctd/ctd-update.cpp; saved on OK/Apply)
       Advanced              Plugin Manager, Scripts, WebSocket Server
                             Settings (they open once Settings closes)
 
@@ -25,6 +27,8 @@
     (at your option) any later version.
 ******************************************************************************/
 
+#include "ctd-update-logic.hpp"
+
 #include "settings/OBSBasicSettings.hpp"
 #include "ui_OBSBasicSettings.h"
 
@@ -32,7 +36,12 @@
 
 #include <qt-wrappers.hpp>
 
+#include <OBSApp.hpp>
+
+#include <QCheckBox>
+#include <QComboBox>
 #include <QDockWidget>
+#include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -136,6 +145,34 @@ void OBSBasicSettings::CtdInitPage()
 		});
 	}
 
+	/* Updates: CTD OBS's own update check (Windows and macOS builds) */
+	if (CtdCurrentPlatform() != CtdUpdatePlatform::Other) {
+		QVBoxLayout *updatesLayout;
+		layout->addWidget(CtdGroup(QTStr("CTD.Settings.Updates"), QTStr("CTD.Settings.Updates.Text"), body,
+					   &updatesLayout));
+		config_t *config = App()->GetUserConfig();
+
+		ctdUpdateAuto = new QCheckBox(QTStr("CTD.Settings.Updates.Auto"), body);
+		ctdUpdateAuto->setChecked(config_get_bool(config, kCtdUpdateSection, kCtdUpdateKeyAuto));
+		updatesLayout->addWidget(ctdUpdateAuto);
+
+		auto *form = new QFormLayout();
+		ctdUpdateChannel = new QComboBox(body);
+		ctdUpdateChannel->addItem(QTStr("CTD.Settings.Updates.Channel.Stable"), QStringLiteral("stable"));
+		ctdUpdateChannel->addItem(QTStr("CTD.Settings.Updates.Channel.Test"), QStringLiteral("test"));
+		const char *channel = config_get_string(config, kCtdUpdateSection, kCtdUpdateKeyChannel);
+		ctdUpdateChannel->setCurrentIndex(channel && strcmp(channel, "test") == 0 ? 1 : 0);
+		form->addRow(QTStr("CTD.Settings.Updates.Channel"), ctdUpdateChannel);
+		updatesLayout->addLayout(form);
+
+		auto changed = [this]() {
+			ctdChanged = true;
+			EnableApplyButton(true);
+		};
+		connect(ctdUpdateAuto, &QCheckBox::toggled, this, changed);
+		connect(ctdUpdateChannel, &QComboBox::currentIndexChanged, this, changed);
+	}
+
 	/* Advanced (gap 19): OBS's own tools, which open as separate windows once Settings closes */
 	QVBoxLayout *advancedLayout;
 	layout->addWidget(
@@ -170,6 +207,18 @@ void OBSBasicSettings::CtdInitPage()
 	auto *item = new QListWidgetItem(QIcon(QStringLiteral(":/res/images/obs.png")), QTStr("CTD.Settings"),
 					 ui->listWidget);
 	ctdPageRow = ui->listWidget->row(item);
+}
+
+void OBSBasicSettings::CtdSaveSettings()
+{
+	config_t *config = App()->GetUserConfig();
+	if (ctdUpdateAuto) {
+		config_set_bool(config, kCtdUpdateSection, kCtdUpdateKeyAuto, ctdUpdateAuto->isChecked());
+	}
+	if (ctdUpdateChannel) {
+		config_set_string(config, kCtdUpdateSection, kCtdUpdateKeyChannel,
+				  QT_TO_UTF8(ctdUpdateChannel->currentData().toString()));
+	}
 }
 
 void OBSBasicSettings::CtdShowPage()
