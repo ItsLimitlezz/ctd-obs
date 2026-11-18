@@ -42,7 +42,7 @@
     --border_radius_small: 0px;
     --border_radius_large: 4px;
 
-    /* CTD docks and windows (CTD Relay, CTD Hub, servers, devices): the CTD plugin leaves its own colours out
+    /* CTD docks and windows (CTD Relay, CTD Relay · Feeds, feed servers, devices): the CTD plugin leaves its own colours out
      * when the active theme styles #ctdRoot, so they follow the theme */
     --ctd_void: var(--grey8);
     --ctd_surface: var(--grey7);

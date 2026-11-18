@@ -113,7 +113,7 @@ in the menus.
 
 ## What is and isn't in the macOS build
 
-In: CTD Relay and CTD Hub docks, Send stream (main + vertical), the vertical canvas, Show Profiles, the CTD menu and
+In: CTD Relay and CTD Relay · Feeds docks, Send stream (main + vertical), the vertical canvas, Show Profiles, the CTD menu and
 Settings ▸ CTD, CTD Night theme, browser sources, WebSocket server.
 
 Not in, or untested:
