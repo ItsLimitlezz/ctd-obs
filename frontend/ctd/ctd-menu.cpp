@@ -7,6 +7,9 @@
         Feed Servers…                     the CTD plugin's feed servers window
                                           (incoming feeds are part of CTD Relay;
                                           there is no "CTD Hub")
+        Failover…                         the CTD plugin's failover window (what
+                                          to do when a feed on program dies);
+                                          only with a plugin that has it
         CTD Settings…                     OBS Settings, on its CTD page
         Check for Updates…                CTD OBS's update check (ctd-update.cpp)
         Advanced ▸ Plugin Manager… · Scripts… · WebSocket Server Settings…
@@ -20,11 +23,19 @@
           Registered before modules load. When it exists, the CTD plugin leaves
           its servers item out of Tools, since this menu has it.
 
+      void ctd_menu_failover_available(out bool available)
+          The same for the plugin's failover window (CTD OBS F2).
+
     Called here, registered by the CTD plugin (ctd-obs-plugin, src/ui/servers-dialog.cpp):
 
       void ctd_servers_dialog_open()
           Opens the servers window. A plugin without it still has its Tools
           item, which Feed Servers… then triggers instead.
+
+      void ctd_failover_available(out bool available)
+      void ctd_failover_dialog_open()
+          src/ui/failover-dialog.cpp. Failover… is only in the menu when the
+          first one answers true.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -86,6 +97,9 @@ void OBSBasic::CtdMenuInit()
 {
 	proc_handler_add(obs_get_proc_handler(), "void ctd_menu_available(out bool available)", CtdMenuAvailableProc,
 			 nullptr);
+	/* the same answer, asked by the plugin's failover window: this menu has it, so Tools doesn't */
+	proc_handler_add(obs_get_proc_handler(), "void ctd_menu_failover_available(out bool available)",
+			 CtdMenuAvailableProc, nullptr);
 
 	ctdMenu = new QMenu(QTStr("CTD.Menu"), ui->menubar);
 	ctdMenu->setObjectName(QStringLiteral("menuCTD"));
@@ -134,6 +148,21 @@ void OBSBasic::CtdMenuRebuild()
 	});
 	/* the plugin (its proc or, if older, its Tools item) must be there for the item to do anything */
 	servers->setEnabled(obs_get_module(kCtdPluginModule) != nullptr);
+
+	/* Failover… (CTD OBS F2): only when the plugin says it has the window */
+	calldata_t failoverCd = {};
+	const bool hasFailover = proc_handler_call(obs_get_proc_handler(), "ctd_failover_available", &failoverCd) &&
+				 calldata_bool(&failoverCd, "available");
+	calldata_free(&failoverCd);
+	if (hasFailover) {
+		QAction *failover = ctdMenu->addAction(QTStr("CTD.Menu.Failover"));
+		failover->setMenuRole(QAction::NoRole);
+		connect(failover, &QAction::triggered, this, []() {
+			calldata_t cd = {};
+			proc_handler_call(obs_get_proc_handler(), "ctd_failover_dialog_open", &cd);
+			calldata_free(&cd);
+		});
+	}
 
 	QAction *settings = ctdMenu->addAction(QTStr("CTD.Menu.Settings"));
 	settings->setMenuRole(QAction::NoRole);
