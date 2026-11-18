@@ -33,28 +33,29 @@
 //     * Data:                  <Environment Variable>/<Plugin>.plugin/Contents/Resources
 //
 // * Root Path:                 <User>/Library/Application Support
-//     * Binary:                <Root Path>/obs-studio/plugins/<Plugin>.plugin/Contents/MacOS/<Plugin>
-//     * Data:                  <Root Path>/obs-studio/plugins/<Plugin>.plugin/Contents/Resources
+//     * Binary:                <Root Path>/ctd-obs/plugins/<Plugin>.plugin/Contents/MacOS/<Plugin>
+//     * Data:                  <Root Path>/ctd-obs/plugins/<Plugin>.plugin/Contents/Resources
 //
 // * Legacy User Path:          <Environment Variable> + <Data Environment Variable>
 //     * Binary:                <Environment Variable>/<Plugin>.plugin/Contents/MacOS/<Plugin>
 //     * Data:                  <Data Environment Variable>/<Plugin>.plugin/Contents/Resources
 //
 // * Legacy System Root Path:   /Library/Application Support
-//     * Legacy binary:         <Legacy System Root Path>/obs-studio/plugins/<Plugin>/bin/<Plugin>.so
-//     * Legacy data:           <Legacy System Root Path>/obs-studio/plugins/<Plugin>/data
+//     * Legacy binary:         <Legacy System Root Path>/ctd-obs/plugins/<Plugin>/bin/<Plugin>.so
+//     * Legacy data:           <Legacy System Root Path>/ctd-obs/plugins/<Plugin>/data
 //
 // * Legacy User Root Path:     <User>/Library/Application Support
-//     * Legacy binary:         <Legacy User Root Path>/obs-studio/plugins/<Plugin>/bin/<Plugin>.so
-//     * Legacy data:           <Legacy User Root Path>/obs-studio/plugins/<Plugin>/data
+//     * Legacy binary:         <Legacy User Root Path>/ctd-obs/plugins/<Plugin>/bin/<Plugin>.so
+//     * Legacy data:           <Legacy User Root Path>/ctd-obs/plugins/<Plugin>/data
 //
 
 using State = OBS::PluginManager::State;
 using ModuleType = obs_runtime_module_type;
 
-constexpr std::string_view kPluginPathSuffix {"obs-studio/plugins/%module%.plugin"};
+// CTD OBS: its own plugin folders, never OBS Studio's
+constexpr std::string_view kPluginPathSuffix {"ctd-obs/plugins/%module%.plugin"};
 constexpr std::string_view kUserPluginPathSuffix {"/%module%.plugin"};
-constexpr std::string_view kLegacyPluginPathSuffix {"obs-studio/plugins/%module%"};
+constexpr std::string_view kLegacyPluginPathSuffix {"ctd-obs/plugins/%module%"};
 
 #ifdef __aarch64__
 constexpr bool kIsAppleSilicon = true;

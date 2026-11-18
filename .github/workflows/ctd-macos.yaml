@@ -1,0 +1,248 @@
+name: CTD OBS macOS
+run-name: ${{ github.ref_name }} macOS build
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+    branches:
+      - 'ctd/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  macos-build:
+    name: macOS arm64 (${{ matrix.host }})
+    # OBS's build needs Xcode 26.5 (SDK 26.5) and a macOS 26 host (cmake/macos/compilerconfig.cmake,
+    # .github/scripts/utils.zsh/check_macos), which the macos-15 image doesn't have. Both hosts build the same Apple
+    # Silicon (arm64) app: macos-26 natively, macos-26-intel cross-compiling, because GitHub's arm64 Macs are often
+    # short of capacity ("job was not acquired by Runner"). Use whichever artifact finishes first.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: macos-26
+            artifactSuffix: ''
+          - host: macos-26-intel
+            artifactSuffix: '-intel-host'
+    runs-on: ${{ matrix.host }}
+    defaults:
+      run:
+        shell: zsh --no-rcs --errexit --pipefail {0}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up environment
+        id: setup
+        run: |
+          : Set up environment
+          sudo xcode-select --switch /Applications/Xcode_26.5.app/Contents/Developer
+          xcodebuild -version
+
+          local xcode_cas_path="${HOME}/Library/Developer/Xcode/DerivedData/CompilationCache.noindex"
+          mkdir -p ${xcode_cas_path}
+          print "xcodeCasPath=${xcode_cas_path}" >> $GITHUB_OUTPUT
+          print "ctdVersion=$(head -n 1 CTD-VERSION | LC_ALL=C tr -cd '0-9.')" >> $GITHUB_OUTPUT
+          print "shortSha=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+
+      # Xcode's compilation cache, kept between runs (also after a failed build) so the next push rebuilds only what
+      # changed. Each run saves a new entry; restore takes the newest.
+      - uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        id: xcode-cache
+        with:
+          path: ${{ steps.setup.outputs.xcodeCasPath }}
+          key: macOS-ctd-xcode-arm64-${{ matrix.host }}-RelWithDebInfo-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            macOS-ctd-xcode-arm64-${{ matrix.host }}-RelWithDebInfo-
+            macOS-ctd-xcode-arm64-RelWithDebInfo-
+
+      # The build is always signed ad hoc ("-", the default when codesign is off); Package re-signs the renamed bundle,
+      # with CTD's Developer ID when the signing secrets are set (docs/ctd/macos-signing.md), else ad hoc.
+      - name: Build
+        uses: ./.github/actions/build-obs
+        env:
+          XCODE_CAS_PATH: ${{ steps.setup.outputs.xcodeCasPath }}
+        with:
+          target: arm64
+          config: RelWithDebInfo
+
+      # Developer ID signing (docs/ctd/macos-signing.md): a temporary keychain with CTD's certificate. Without
+      # MACOS_CERT_P12_BASE64 (forks, or before the secrets are added) the build stays ad hoc signed, as before.
+      - name: Set up signing
+        id: signing
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          : Set up signing
+          if [[ -z ${MACOS_CERT_P12_BASE64} ]] {
+            print 'signed=false' >> $GITHUB_OUTPUT
+            print '::notice::MACOS_CERT_P12_BASE64 is not set: signed ad hoc, not notarized'
+            print '### macOS signing: ad hoc, not notarized' >> $GITHUB_STEP_SUMMARY
+            print -r -- 'The `MACOS_CERT_P12_BASE64` secret is not set (a fork, or before CTD added it), so this build' \
+              'is signed ad hoc and needs the `xattr` step in docs/ctd/macos-run.md.' \
+              'Setup: docs/ctd/macos-signing.md.' >> $GITHUB_STEP_SUMMARY
+            exit 0
+          }
+          .github/scripts/ctd-macos-sign keychain
+          print 'signed=true' >> $GITHUB_OUTPUT
+
+      - name: Package
+        id: package
+        env:
+          CTD_VERSION: ${{ steps.setup.outputs.ctdVersion }}
+          SHORT_SHA: ${{ steps.setup.outputs.shortSha }}
+          CTD_SIGNED: ${{ steps.signing.outputs.signed }}
+          CODESIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          : Package
+          cd build_macos
+
+          local app='CTD OBS.app'
+          rm -rf ${app}
+          ditto OBS.app ${app}
+
+          local plist="${app}/Contents/Info.plist"
+          local pb=/usr/libexec/PlistBuddy
+
+          # Branding comes from cmake/macos/helpers.cmake and frontend/cmake/macos/Info.plist.in; this enforces it on
+          # the package and flags any key the build didn't set.
+          ensure_key() {
+            local key=${1} want=${2} have
+            have="$(${pb} -c "Print :${key}" ${plist} 2>/dev/null || true)"
+            if [[ ${have} != ${want} ]] {
+              print "::warning::Info.plist ${key} was '${have}', set to '${want}'"
+              plutil -replace ${key} -string ${want} ${plist}
+            }
+          }
+          ensure_key CFBundleIdentifier com.cinetechdigital.ctd-obs
+          ensure_key CFBundleName 'CTD OBS'
+          ensure_key CFBundleDisplayName 'CTD OBS'
+
+          print '::group::Info.plist'
+          plutil -p ${plist}
+          print '::endgroup::'
+
+          # What must and must not be in the bundle
+          local -a required=(
+            Contents/PlugIns/ctd-live-source.plugin
+            Contents/PlugIns/vertical-canvas.plugin
+            Contents/PlugIns/obs-browser.plugin
+            Contents/PlugIns/obs-websocket.plugin
+          )
+          local -i missing=0
+          for item (${required}) {
+            if [[ ! -e ${app}/${item} ]] { print "::error::Missing ${item}"; missing=1 }
+          }
+          if [[ -e ${app}/Contents/PlugIns/mac-virtualcam.plugin ]] { print '::error::mac-virtualcam is bundled'; missing=1 }
+          if [[ -e ${app}/Contents/Frameworks/Sparkle.framework ]] { print '::error::Sparkle (OBS updater) is bundled'; missing=1 }
+          print '::group::PlugIns'
+          ls -1 ${app}/Contents/PlugIns
+          print '::endgroup::'
+          if (( missing )) exit 1
+
+          local exe="${app}/Contents/MacOS/$(${pb} -c 'Print :CFBundleExecutable' ${plist})"
+          print "Executable architectures: $(lipo -archs ${exe})"
+          if [[ $(lipo -archs ${exe}) != *arm64* ]] { print '::error::Executable is not arm64'; exit 1 }
+
+          if [[ ${CTD_SIGNED} == true ]] {
+            # Developer ID, inside out, hardened runtime, secure timestamp; notarized and stapled in the next step
+            ${GITHUB_WORKSPACE}/.github/scripts/ctd-macos-sign sign ${app}
+          } else {
+            # Ad hoc signature over the whole bundle, so it launches on Apple Silicon once the quarantine attribute is
+            # removed (docs/ctd/macos-run.md). No Developer ID, no notarization, no hardened runtime.
+            codesign --force --deep --sign - ${app}
+            codesign --verify --deep --verbose=2 ${app}
+            codesign --verify --deep --strict --verbose=2 ${app} || print '::warning::strict signature check failed'
+          }
+
+          # ditto keeps the frameworks' symlinks and the executables' permissions (a plain artifact zip doesn't)
+          local zip_name="ctd-obs-${CTD_VERSION}-${SHORT_SHA}-macos-arm64.zip"
+          ditto -c -k --sequesterRsrc --keepParent ${app} ${zip_name}
+          ls -l ${zip_name}
+          print "zipName=${zip_name}" >> $GITHUB_OUTPUT
+
+      # Apple's notary service checks the signed app; the stapled ticket lets Gatekeeper open it without a network
+      # check. The zip is made again from the stapled app, then a signed, notarized and stapled disk image beside it.
+      # Fails the job when Apple rejects either; the notary log is printed in both cases.
+      - name: Notarize
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          ZIP_NAME: ${{ steps.package.outputs.zipName }}
+          CODESIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          NOTARY_KEY_P8_BASE64: ${{ secrets.NOTARY_KEY_P8_BASE64 }}
+        run: |
+          : Notarize
+          cd build_macos
+          local app='CTD OBS.app'
+          local sign_script=${GITHUB_WORKSPACE}/.github/scripts/ctd-macos-sign
+          print '### macOS signing: Developer ID, notarized' >> $GITHUB_STEP_SUMMARY
+
+          ${sign_script} notarize ${app}
+          rm -f ${ZIP_NAME}
+          ditto -c -k --sequesterRsrc --keepParent ${app} ${ZIP_NAME}
+
+          local dmg=${ZIP_NAME:r}.dmg
+          ${sign_script} dmg ${app} ${dmg}
+          ${sign_script} notarize ${dmg}
+          ls -l ${ZIP_NAME} ${dmg}
+
+      - name: Remove signing keychain
+        if: always() && (steps.signing.outcome == 'success' || steps.signing.outcome == 'failure')
+        run: |
+          : Remove signing keychain
+          .github/scripts/ctd-macos-sign cleanup
+
+      - name: Upload package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ctd-obs-macos-arm64-${{ github.sha }}${{ matrix.artifactSuffix }}
+          # the disk image exists only on signed builds
+          path: |
+            ${{ github.workspace }}/build_macos/${{ steps.package.outputs.zipName }}
+            ${{ github.workspace }}/build_macos/ctd-obs-*-macos-arm64.dmg
+          if-no-files-found: error
+
+      # After the upload, so a failure here still leaves the package to look at. OBS itself isn't started: GitHub's
+      # macOS VMs crash it in Qt (ctd-obs-plugin #33). --version exits before any UI, which still proves the signed
+      # bundle loads (dyld finds every linked library, the signature is accepted on arm64).
+      - name: Smoke test
+        run: |
+          : Smoke test
+          cd build_macos
+          local app='CTD OBS.app'
+          local exe="${app}/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' ${app}/Contents/Info.plist)"
+
+          # an Intel runner can't execute the arm64 app (Rosetta only runs x86_64 code)
+          if [[ $(uname -m) == arm64 ]] {
+            local out="$(${exe} --version)"
+            print "${out}"
+            if [[ ${out} != 'CTD OBS '* ]] { print '::error::--version did not report CTD OBS'; exit 1 }
+          } else {
+            print 'Intel host: --version skipped'
+          }
+
+          # every @rpath library the CTD modules link must be inside the bundle
+          local -i missing=0
+          local plugin lib name
+          for plugin (ctd-live-source vertical-canvas) {
+            for lib (${(f)"$(otool -L ${app}/Contents/PlugIns/${plugin}.plugin/Contents/MacOS/${plugin} | awk 'NR>1 && $1 ~ /^@rpath\// {print $1}')"}) {
+              name=${lib#@rpath/}
+              if [[ ! -e ${app}/Contents/Frameworks/${name} ]] { print "::error::${plugin}: ${lib} not in the bundle"; missing=1 }
+            }
+          }
+          if (( missing )) exit 1
+          print 'CTD modules: all @rpath libraries present'
+
+      - uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        if: always() && steps.setup.outcome == 'success'
+        with:
+          path: ${{ steps.setup.outputs.xcodeCasPath }}
+          key: macOS-ctd-xcode-arm64-${{ matrix.host }}-RelWithDebInfo-${{ github.run_id }}-${{ github.run_attempt }}

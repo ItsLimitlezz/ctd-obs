@@ -50,10 +50,16 @@ function Package {
     $CommitHash = $($Tokens[-1]).SubString(1)
     $CommitDistance = $Tokens[-2]
 
+    # CTD OBS's own version (CTD-VERSION, Major.Minor.Patch), not the OBS release it is based on
+    $CtdVersion = (Get-Content -Path "${ProjectRoot}/CTD-VERSION" -TotalCount 1).Trim().TrimStart([char]0xFEFF)
+    if ( ! ( $CtdVersion -match '^\d+\.\d+\.\d+$' ) ) {
+        throw "CTD-VERSION must hold <MAJOR>.<MINOR>.<PATCH>, not '${CtdVersion}'"
+    }
+
     if ( $CommitDistance -gt 0 ) {
-        $OutputName = "ctd-obs-${CommitVersion}-${CommitHash}"
+        $OutputName = "ctd-obs-${CtdVersion}-${CommitHash}"
     } else {
-        $OutputName = "ctd-obs-${CommitVersion}"
+        $OutputName = "ctd-obs-${CtdVersion}"
     }
 
     $CpackArgs = @(
@@ -79,7 +85,7 @@ function Package {
         $InstallerArgs = @{
             ZipFile = "${ProjectRoot}/build_${Target}/${OutputName}-windows-${Target}.zip"
             Version = $OutputName -replace '^ctd-obs-', ''
-            CommitVersion = $CommitVersion
+            CommitVersion = $CtdVersion
             CommitDistance = $CommitDistance
         }
         New-Installer @InstallerArgs
