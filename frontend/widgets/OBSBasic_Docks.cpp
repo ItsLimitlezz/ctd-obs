@@ -49,7 +49,7 @@ void setupDockAction(QDockWidget *dock)
 /* CTD OBS: dock ids of CTD OBS's built-in modules (CTD plugin, vertical canvas). They're part of the app: Reset UI
  * doesn't warn about them and docks them like OBS's own. These are the modules' saved dock ids; never rename them. */
 static const char *const kCtdRelayDock = "ctd-multistream";
-static const char *const kCtdHubDock = "ctd-hub";
+static const char *const kCtdFeedsDock = "ctd-hub";
 static const char *const kCtdVerticalDock = "VerticalCanvasDock";
 static const char *const kCtdVerticalScenesDock = "VerticalCanvasDockScenes";
 static const char *const kCtdVerticalSourcesDock = "VerticalCanvasDockSources";
@@ -57,7 +57,7 @@ static const char *const kCtdVerticalTransitionsDock = "VerticalCanvasDockTransi
 
 bool OBSBasic::IsCtdBuiltInDock(const QString &name)
 {
-	for (const char *id : {kCtdRelayDock, kCtdHubDock, kCtdVerticalDock, kCtdVerticalScenesDock,
+	for (const char *id : {kCtdRelayDock, kCtdFeedsDock, kCtdVerticalDock, kCtdVerticalScenesDock,
 			       kCtdVerticalSourcesDock, kCtdVerticalTransitionsDock}) {
 		if (name == QLatin1String(id)) {
 			return true;
@@ -77,12 +77,12 @@ QDockWidget *OBSBasic::FindExtraDock(const char *name) const
 }
 
 /* CTD OBS: the vertical canvas on the right with its Scenes / Sources / Transitions docks under OBS's own (where the
- * vertical canvas puts them on its first run), CTD Relay docked right of it and visible, CTD Hub tabbed behind Relay */
+ * vertical canvas puts them on its first run), CTD Relay docked right of it and visible, CTD Relay · Feeds tabbed behind Relay */
 void OBSBasic::ResetCtdDocks()
 {
 	QDockWidget *vertical = FindExtraDock(kCtdVerticalDock);
 	QDockWidget *relay = FindExtraDock(kCtdRelayDock);
-	QDockWidget *hub = FindExtraDock(kCtdHubDock);
+	QDockWidget *hub = FindExtraDock(kCtdFeedsDock);
 
 	if (vertical) {
 		vertical->setFloating(false);

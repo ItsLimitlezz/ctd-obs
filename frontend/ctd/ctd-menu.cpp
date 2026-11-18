@@ -2,8 +2,11 @@
     CTD OBS: the top-level CTD menu (integration gaps 3 and 19).
 
       CTD
-        CTD Relay / CTD Hub / Vertical    the docks' own show/hide actions
-        Hub Servers…                      the CTD plugin's servers window
+        CTD Relay / CTD Relay · Feeds / Vertical
+                                          the docks' own show/hide actions
+        Feed Servers…                     the CTD plugin's feed servers window
+                                          (incoming feeds are part of CTD Relay;
+                                          there is no "CTD Hub")
         CTD Settings…                     OBS Settings, on its CTD page
         Check for Updates…                CTD OBS's update check (ctd-update.cpp)
         Advanced ▸ Plugin Manager… · Scripts… · WebSocket Server Settings…
@@ -21,7 +24,7 @@
 
       void ctd_servers_dialog_open()
           Opens the servers window. A plugin without it still has its Tools
-          item, which Hub Servers… then triggers instead.
+          item, which Feed Servers… then triggers instead.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -39,14 +42,17 @@
 #include <QMenu>
 #include <QMenuBar>
 
-/* Dock ids of CTD OBS's built-in modules, in menu order. These are the modules' saved dock ids; never rename them. */
+/* Dock ids of CTD OBS's built-in modules, in menu order. These are the modules' saved dock ids; never rename them
+ * ("ctd-hub" is the CTD Relay · Feeds dock: the id is from before it was renamed, so saved layouts keep working). */
 static const char *const kCtdMenuDocks[] = {"ctd-multistream", "ctd-hub", "VerticalCanvasDock"};
 
 /* The CTD plugin's module (plugins/ctd-live-source) */
 static const char *const kCtdPluginModule = "ctd-live-source";
 
-/* The CTD plugin's Tools item before it had ctd_servers_dialog_open (hard-coded English; renamed in its text pass) */
-static const char *const kLegacyServersToolsItems[] = {"CTD Hub servers…", "CTD Live servers…"};
+/* The CTD plugin's Tools item, for a plugin without ctd_servers_dialog_open or one that still adds it (newest name
+ * first; the older ones were hard-coded English) */
+static const char *const kLegacyServersToolsItems[] = {"CTD Relay feed servers…", "CTD Hub servers…",
+						       "CTD Live servers…"};
 
 static void CtdMenuAvailableProc(void *, calldata_t *cd)
 {

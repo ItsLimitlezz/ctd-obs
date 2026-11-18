@@ -1,8 +1,8 @@
 /******************************************************************************
     CTD OBS: the Settings ▸ CTD page (integration gaps 7 and 19).
 
-      CTD Relay + CTD Hub   the CTD plugin's section (connection, pairing,
-                            profile, WebSocket sharing, Hub servers)
+      CTD Relay             the CTD plugin's section (connection, pairing,
+                            profile, WebSocket sharing, feed servers)
       Vertical              the vertical canvas's own settings window
       Updates               check for updates automatically, update channel
                             (frontend/ctd/ctd-update.cpp; saved on OK/Apply)
@@ -114,7 +114,7 @@ void OBSBasicSettings::CtdInitPage()
 	auto *layout = new QVBoxLayout(body);
 	layout->setContentsMargins(0, 0, 0, 0);
 
-	/* CTD Relay and CTD Hub: the CTD plugin's own section */
+	/* CTD Relay (with its incoming feeds' servers): the CTD plugin's own section */
 	QWidget *section = nullptr;
 	{
 		calldata_t cd = {};
