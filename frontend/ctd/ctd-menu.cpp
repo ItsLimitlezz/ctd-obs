@@ -43,8 +43,9 @@
 #include <QMenuBar>
 
 /* Dock ids of CTD OBS's built-in modules, in menu order. These are the modules' saved dock ids; never rename them
- * ("ctd-hub" is the CTD Relay · Feeds dock: the id is from before it was renamed, so saved layouts keep working). */
-static const char *const kCtdMenuDocks[] = {"ctd-multistream", "ctd-hub", "VerticalCanvasDock"};
+ * ("ctd-hub" is the CTD Relay · Feeds dock: the id is from before it was renamed, so saved layouts keep working;
+ * "ctd_producer" is the CTD Producer dock: viewers per platform and the merged chat). */
+static const char *const kCtdMenuDocks[] = {"ctd-multistream", "ctd_producer", "ctd-hub", "VerticalCanvasDock"};
 
 /* The CTD plugin's module (plugins/ctd-live-source) */
 static const char *const kCtdPluginModule = "ctd-live-source";
