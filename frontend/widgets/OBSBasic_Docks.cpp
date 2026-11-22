@@ -51,6 +51,7 @@ void setupDockAction(QDockWidget *dock)
 static const char *const kCtdRelayDock = "ctd-multistream";
 static const char *const kCtdFeedsDock = "ctd-hub";
 static const char *const kCtdProducerDock = "ctd_producer";
+static const char *const kCtdOverlaysDock = "ctd-overlays";
 static const char *const kCtdVerticalDock = "VerticalCanvasDock";
 static const char *const kCtdVerticalScenesDock = "VerticalCanvasDockScenes";
 static const char *const kCtdVerticalSourcesDock = "VerticalCanvasDockSources";
@@ -58,7 +59,7 @@ static const char *const kCtdVerticalTransitionsDock = "VerticalCanvasDockTransi
 
 bool OBSBasic::IsCtdBuiltInDock(const QString &name)
 {
-	for (const char *id : {kCtdRelayDock, kCtdFeedsDock, kCtdProducerDock, kCtdVerticalDock,
+	for (const char *id : {kCtdRelayDock, kCtdFeedsDock, kCtdProducerDock, kCtdOverlaysDock, kCtdVerticalDock,
 			       kCtdVerticalScenesDock, kCtdVerticalSourcesDock, kCtdVerticalTransitionsDock}) {
 		if (name == QLatin1String(id)) {
 			return true;
@@ -139,6 +140,16 @@ void OBSBasic::ResetCtdDocks()
 			tabifyDockWidget(relay, producer);
 		}
 		producer->setVisible(true);
+	}
+
+	/* CTD Overlays (CTD Overlay's overlays, updates, the template kit): a tab beside CTD Relay too */
+	if (QDockWidget *overlays = FindExtraDock(kCtdOverlaysDock)) {
+		overlays->setFloating(false);
+		addDockWidget(Qt::RightDockWidgetArea, overlays);
+		if (relay) {
+			tabifyDockWidget(relay, overlays);
+		}
+		overlays->setVisible(true);
 	}
 
 	if (relay) {
