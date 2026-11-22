@@ -63,6 +63,18 @@ Versions for CTD OBS (OBS 33.0.x):
 - If the runtime is missing, too old or can't start, DistroAV logs an error (`ERR-401`…`ERR-406`, `ERR-425`), shows a
   dialog and stays off (no NDI sources or outputs). It doesn't crash. Install or update the runtime and restart.
 
+**Plugin isolation doesn't cover NDI's system components.** On macOS, the NDI Runtime and NDI Tools installers
+also put system-wide parts in place:
+- an audio driver in `/Library/Audio/Plug-Ins/HAL`;
+- a camera plugin, `NDI Virtual Input`, in `/Library/CoreMediaIO/Plug-Ins/DAL`;
+- apps, such as Access Manager and Monitor.
+
+macOS loads these into **every** app that lists audio devices or cameras, including CTD OBS. That happens whatever
+CTD OBS's plugin folders contain. On 2026-11-22 they caused CTD OBS on macOS to freeze and crash about every 15
+minutes, with GPU memory growing to about 17 GB. Removing NDI's audio driver, DAL plugins and apps, plus DistroAV,
+and rebooting fixed it. Install only the **NDI Runtime** that DistroAV needs, not the full NDI Tools. If CTD OBS
+freezes or its memory grows after an NDI install, remove those components and reboot first.
+
 Steps:
 
 1. Install the NDI Runtime (above). On macOS, the NDI 6 Runtime for Apple installer; on Windows the NDI 6 Runtime
