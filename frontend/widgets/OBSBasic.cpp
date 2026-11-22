@@ -931,6 +931,7 @@ void OBSBasic::OBSInit()
 
 	CtdShowRegisterProcs();
 	CtdMenuInit();
+	CtdNdiInit();
 	CtdUpdateInit();
 
 	CtdSplashSetStage(CtdSplashStage::Plugins);

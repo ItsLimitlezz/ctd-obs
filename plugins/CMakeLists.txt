@@ -51,6 +51,9 @@ add_core_module(
 add_core_module(aja-output-ui PLATFORMS WINDOWS MACOS LINUX WITH_MESSAGE)
 add_core_module(coreaudio-encoder PLATFORMS WINDOWS MACOS)
 add_core_module(ctd-live-source PLATFORMS WINDOWS MACOS)
+# CTD OBS: NDI receive and send in-process, no system pieces; the NDI library is loaded at run time only when enabled
+# (docs/ctd/ndi.md)
+add_core_module(ctd-ndi PLATFORMS WINDOWS MACOS)
 # CTD OBS: the vertical canvas (submodule ctd-vertical-canvas) builds the module 'vertical-canvas', the name the core
 # module loader looks for
 if(OS_WINDOWS OR OS_MACOS)

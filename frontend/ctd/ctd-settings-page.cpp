@@ -6,6 +6,9 @@
       Vertical              the vertical canvas's own settings window
       Updates               check for updates automatically, update channel
                             (frontend/ctd/ctd-update.cpp; saved on OK/Apply)
+      NDI                   Off / Receive only / Receive + Send, the sends,
+                            Set up from the NDI Runtime (plugins/ctd-ndi,
+                            docs/ctd/ndi.md; saved and applied on OK/Apply)
       Advanced              Plugin Manager, Scripts, WebSocket Server
                             Settings (they open once Settings closes)
 
@@ -27,6 +30,7 @@
     (at your option) any later version.
 ******************************************************************************/
 
+#include "ctd-ndi.hpp"
 #include "ctd-update-logic.hpp"
 
 #include "settings/OBSBasicSettings.hpp"
@@ -173,6 +177,9 @@ void OBSBasicSettings::CtdInitPage()
 		connect(ctdUpdateChannel, &QComboBox::currentIndexChanged, this, changed);
 	}
 
+	/* NDI (docs/ctd/ndi.md) */
+	CtdInitNdiSection(body, layout);
+
 	/* Advanced (gap 19): OBS's own tools, which open as separate windows once Settings closes */
 	QVBoxLayout *advancedLayout;
 	layout->addWidget(
@@ -218,6 +225,154 @@ void OBSBasicSettings::CtdSaveSettings()
 	if (ctdUpdateChannel) {
 		config_set_string(config, kCtdUpdateSection, kCtdUpdateKeyChannel,
 				  QT_TO_UTF8(ctdUpdateChannel->currentData().toString()));
+	}
+	if (ctdNdiMode) {
+		config_set_string(config, kCtdNdiSection, kCtdNdiKeyMode,
+				  QT_TO_UTF8(ctdNdiMode->currentData().toString()));
+		config_set_bool(config, kCtdNdiSection, kCtdNdiKeySendProgram, ctdNdiSendProgram->isChecked());
+		config_set_bool(config, kCtdNdiSection, kCtdNdiKeySendVertical, ctdNdiSendVertical->isChecked());
+		blog(LOG_INFO, "[ctd-ndi] Settings: NDI %s, send program %s, send vertical %s",
+		     QT_TO_UTF8(ctdNdiMode->currentData().toString()), ctdNdiSendProgram->isChecked() ? "on" : "off",
+		     ctdNdiSendVertical->isChecked() ? "on" : "off");
+		/* takes effect at once: going Off stops every receiver and send */
+		CtdNdiApply();
+		CtdNdiRefreshStatus();
+	}
+}
+
+/* NDI: mode, sends, the library's state. Without the NDI module only a note. */
+void OBSBasicSettings::CtdInitNdiSection(QWidget *body, QVBoxLayout *layout)
+{
+	auto *group = new QGroupBox(QTStr("CTD.Settings.NDI"), body);
+	auto *groupLayout = new QVBoxLayout(group);
+	layout->addWidget(group);
+
+	auto *intro = new QLabel(QTStr("CTD.Settings.NDI.Text"), group);
+	intro->setWordWrap(true);
+	intro->setTextFormat(Qt::RichText);
+	intro->setOpenExternalLinks(true);
+	groupLayout->addWidget(intro);
+
+	const CtdNdiStatus status = CtdNdiQueryStatus();
+	if (!status.available) {
+		auto *none = new QLabel(QTStr("CTD.NDI.NoModule"), group);
+		none->setWordWrap(true);
+		groupLayout->addWidget(none);
+		return;
+	}
+
+	CtdNdiSetConfigDefaults();
+	config_t *config = App()->GetUserConfig();
+
+	auto *form = new QFormLayout();
+	ctdNdiMode = new QComboBox(group);
+	ctdNdiMode->addItem(QTStr("CTD.Settings.NDI.Mode.Off"), QStringLiteral("off"));
+	ctdNdiMode->addItem(QTStr("CTD.Settings.NDI.Mode.Receive"), QStringLiteral("receive"));
+	ctdNdiMode->addItem(QTStr("CTD.Settings.NDI.Mode.ReceiveSend"), QStringLiteral("receive_send"));
+	const char *mode = config_get_string(config, kCtdNdiSection, kCtdNdiKeyMode);
+	const int index = ctdNdiMode->findData(QString::fromUtf8(mode ? mode : "off"));
+	ctdNdiMode->setCurrentIndex(index >= 0 ? index : 0);
+	form->addRow(QTStr("CTD.Settings.NDI.Mode"), ctdNdiMode);
+	groupLayout->addLayout(form);
+
+	ctdNdiSendProgram = new QCheckBox(QTStr("CTD.Settings.NDI.SendProgram"), group);
+	ctdNdiSendProgram->setChecked(config_get_bool(config, kCtdNdiSection, kCtdNdiKeySendProgram));
+	groupLayout->addWidget(ctdNdiSendProgram);
+	ctdNdiSendVertical = new QCheckBox(QTStr("CTD.Settings.NDI.SendVertical"), group);
+	ctdNdiSendVertical->setChecked(config_get_bool(config, kCtdNdiSection, kCtdNdiKeySendVertical));
+	groupLayout->addWidget(ctdNdiSendVertical);
+
+	ctdNdiStatus = new QLabel(group);
+	ctdNdiStatus->setWordWrap(true);
+	groupLayout->addWidget(ctdNdiStatus);
+
+	auto *row = new QHBoxLayout();
+	auto *setup = new QPushButton(QTStr("CTD.Settings.NDI.Setup"), group);
+	row->addWidget(setup);
+	auto *runtime = new QLabel(QTStr("CTD.Settings.NDI.Runtime")
+#ifdef __APPLE__
+					   .arg(QStringLiteral("https://ndi.link/NDIRedistV6Apple")),
+#else
+					   .arg(QStringLiteral("https://ndi.link/NDIRedistV6")),
+#endif
+				   group);
+	runtime->setTextFormat(Qt::RichText);
+	runtime->setOpenExternalLinks(true);
+	row->addWidget(runtime);
+	row->addStretch(1);
+	groupLayout->addLayout(row);
+
+	ctdNdiWarning = new QLabel(group);
+	ctdNdiWarning->setWordWrap(true);
+	ctdNdiWarning->setProperty("class", "text-warning");
+	groupLayout->addWidget(ctdNdiWarning);
+
+	auto sendsEnabled = [this]() {
+		const bool sends = ctdNdiMode->currentData().toString() == QStringLiteral("receive_send");
+		ctdNdiSendProgram->setEnabled(sends);
+		ctdNdiSendVertical->setEnabled(sends);
+	};
+	sendsEnabled();
+
+	auto changed = [this]() {
+		ctdChanged = true;
+		EnableApplyButton(true);
+	};
+	connect(ctdNdiMode, &QComboBox::currentIndexChanged, this, changed);
+	connect(ctdNdiMode, &QComboBox::currentIndexChanged, this, sendsEnabled);
+	connect(ctdNdiSendProgram, &QCheckBox::toggled, this, changed);
+	connect(ctdNdiSendVertical, &QCheckBox::toggled, this, changed);
+	connect(setup, &QPushButton::clicked, this, [this]() {
+		std::string message;
+		const bool ok = CtdNdiSetup(message);
+		CtdNdiRefreshStatus();
+		if (!ok) {
+			OBSMessageBox::warning(this, QTStr("CTD.Settings.NDI"), QString::fromStdString(message));
+		}
+	});
+
+	CtdNdiRefreshStatus();
+}
+
+void OBSBasicSettings::CtdNdiRefreshStatus()
+{
+	if (!ctdNdiStatus) {
+		return;
+	}
+	const CtdNdiStatus status = CtdNdiQueryStatus();
+
+	QStringList lines;
+	if (status.launchDisabled) {
+		lines << QTStr("CTD.Settings.NDI.LaunchOff");
+	}
+	if (status.loaded) {
+		lines << QTStr("CTD.Settings.NDI.Loaded").arg(QString::fromStdString(status.version));
+		if (status.mode == "off") {
+			lines << QTStr("CTD.Settings.NDI.OffUntilRestart");
+		} else if (status.paused) {
+			lines << QTStr("CTD.Settings.NDI.Paused");
+		} else {
+			lines << QTStr("CTD.Settings.NDI.Active")
+					 .arg(status.receivers)
+					 .arg(status.maxReceivers)
+					 .arg(status.sends);
+		}
+	} else if (!status.installed.empty()) {
+		lines << QTStr("CTD.Settings.NDI.Installed").arg(QString::fromStdString(status.installed));
+	} else {
+		lines << QTStr("CTD.Settings.NDI.NotSetUp");
+	}
+	if (!status.loaded && !status.message.empty()) {
+		lines << QString::fromStdString(status.message);
+	}
+	ctdNdiStatus->setText(lines.join(QStringLiteral("\n")));
+
+	if (!status.systemPieces.empty()) {
+		ctdNdiWarning->setText(
+			QTStr("CTD.Settings.NDI.SystemPieces").arg(QString::fromStdString(status.systemPieces)));
+		ctdNdiWarning->show();
+	} else {
+		ctdNdiWarning->hide();
 	}
 }
 

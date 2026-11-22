@@ -158,6 +158,7 @@ jobs:
           # What must and must not be in the bundle
           local -a required=(
             Contents/PlugIns/ctd-live-source.plugin
+            Contents/PlugIns/ctd-ndi.plugin
             Contents/PlugIns/vertical-canvas.plugin
             Contents/PlugIns/obs-browser.plugin
             Contents/PlugIns/obs-websocket.plugin
@@ -168,6 +169,9 @@ jobs:
           }
           if [[ -e ${app}/Contents/PlugIns/mac-virtualcam.plugin ]] { print '::error::mac-virtualcam is bundled'; missing=1 }
           if [[ -e ${app}/Contents/Frameworks/Sparkle.framework ]] { print '::error::Sparkle (OBS updater) is bundled'; missing=1 }
+          # docs/ctd/ndi.md: the NDI library is never shipped (CTD_NDI_BUNDLED is off), and no NDI system pieces
+          local -a ndi_files=(${app}/**/(libndi*|*NDI*.plugin|*NDI*.driver)(N))
+          if (( ${#ndi_files} )) { print "::error::NDI library or system piece in the bundle: ${ndi_files}"; missing=1 }
           print '::group::PlugIns'
           ls -1 ${app}/Contents/PlugIns
           print '::endgroup::'
@@ -259,7 +263,7 @@ jobs:
           # every @rpath library the CTD modules link must be inside the bundle
           local -i missing=0
           local plugin lib name
-          for plugin (ctd-live-source vertical-canvas) {
+          for plugin (ctd-live-source ctd-ndi vertical-canvas) {
             for lib (${(f)"$(otool -L ${app}/Contents/PlugIns/${plugin}.plugin/Contents/MacOS/${plugin} | awk 'NR>1 && $1 ~ /^@rpath\// {print $1}')"}) {
               name=${lib#@rpath/}
               if [[ ! -e ${app}/Contents/Frameworks/${name} ]] { print "::error::${plugin}: ${lib} not in the bundle"; missing=1 }

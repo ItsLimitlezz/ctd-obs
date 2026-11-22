@@ -32,6 +32,8 @@ class Auth;
 class OBSBasic;
 class OBSHotkeyWidget;
 class OBSPropertiesView;
+class QLabel;
+class QVBoxLayout;
 struct FFmpegFormat;
 struct OBSTheme;
 
@@ -232,7 +234,15 @@ private:
 	bool ctdChanged = false;
 	QCheckBox *ctdUpdateAuto = nullptr;
 	QComboBox *ctdUpdateChannel = nullptr;
+	/* NDI (docs/ctd/ndi.md) */
+	QComboBox *ctdNdiMode = nullptr;
+	QCheckBox *ctdNdiSendProgram = nullptr;
+	QCheckBox *ctdNdiSendVertical = nullptr;
+	QLabel *ctdNdiStatus = nullptr;
+	QLabel *ctdNdiWarning = nullptr;
 	void CtdInitPage();
+	void CtdInitNdiSection(QWidget *body, QVBoxLayout *layout);
+	void CtdNdiRefreshStatus();
 	void CtdSaveSettings();
 
 public:

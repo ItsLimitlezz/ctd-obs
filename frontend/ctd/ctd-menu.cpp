@@ -8,6 +8,8 @@
                                           (incoming feeds are part of CTD Relay;
                                           there is no "CTD Hub")
         CTD Settings…                     OBS Settings, on its CTD page
+        NDI ▸ Pause NDI · Start without NDI… · NDI Settings…
+                                          frontend/ctd/ctd-ndi.cpp
         Check for Updates…                CTD OBS's update check (ctd-update.cpp)
         Advanced ▸ Plugin Manager… · Plugins from OBS Studio… · Scripts… ·
                    WebSocket Server Settings…
@@ -142,6 +144,9 @@ void OBSBasic::CtdMenuRebuild()
 	QAction *settings = ctdMenu->addAction(QTStr("CTD.Menu.Settings"));
 	settings->setMenuRole(QAction::NoRole);
 	connect(settings, &QAction::triggered, this, &OBSBasic::CtdOpenSettings);
+
+	/* frontend/ctd/ctd-ndi.cpp: Pause / Resume NDI, Start without NDI…, NDI Settings… (only with the NDI module) */
+	CtdNdiAddMenu(ctdMenu);
 
 	/* frontend/ctd/ctd-update.cpp: CTD OBS's own update check (Windows and macOS builds) */
 	if (CtdCurrentPlatform() != CtdUpdatePlatform::Other) {

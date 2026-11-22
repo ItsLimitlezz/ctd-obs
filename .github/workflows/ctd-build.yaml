@@ -97,6 +97,21 @@ jobs:
           cmake --build build_ctd_plugins_test
           ctest --test-dir build_ctd_plugins_test --output-on-failure
 
+      # docs/ctd/ndi.md: the NDI allow-list, loader paths (never a system one), queue bounds, receiver cap and the
+      # memory watchdog's maths; also under AddressSanitizer / UBSan and ThreadSanitizer (the queue and slots are
+      # shared between threads)
+      - name: NDI tests
+        run: |
+          cmake -S test/ctd-ndi -B build_ctd_ndi_test
+          cmake --build build_ctd_ndi_test
+          ctest --test-dir build_ctd_ndi_test --output-on-failure
+          for san in address,undefined thread; do
+            cmake -S test/ctd-ndi -B "build_ctd_ndi_test_${san%%,*}" -DCMAKE_CXX_FLAGS="-fsanitize=${san} -g"
+            cmake --build "build_ctd_ndi_test_${san%%,*}"
+            ctest --test-dir "build_ctd_ndi_test_${san%%,*}" --output-on-failure
+          done
+          bash -n test/ctd-ndi/ctd-ndi-soak.sh
+
   windows:
     name: Windows
     needs: setup

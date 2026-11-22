@@ -45,6 +45,19 @@ jobs:
           config: RelWithDebInfo
           package: true
 
+      # docs/ctd/ndi.md: the NDI module is in, the NDI library never is (CTD_NDI_BUNDLED is off)
+      - name: Check NDI packaging
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = Get-ChildItem "${{ github.workspace }}/build_x64/ctd-obs-*-windows-x64.zip" | Select-Object -First 1
+          if (-not $zip) { throw 'No Windows package found' }
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName)
+          try { $entries = @($archive.Entries | ForEach-Object { $_.FullName }) } finally { $archive.Dispose() }
+          if (-not ($entries | Where-Object { $_ -match '(^|[\\/])ctd-ndi\.dll$' })) { throw 'ctd-ndi.dll is not in the package' }
+          $ndi = @($entries | Where-Object { $_ -match 'Processing\.NDI\.' })
+          if ($ndi.Count -gt 0) { throw "NDI library in the package: $($ndi -join ', ')" }
+          Write-Output "ctd-ndi.dll packaged; no NDI library in $($zip.Name)"
+
       - name: Upload package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
