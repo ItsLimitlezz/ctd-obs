@@ -1175,10 +1175,19 @@ void OBSBasic::OBSInit()
 		config_save_safe(App()->GetUserConfig(), "tmp", nullptr);
 	}
 
-	if (!first_run && !has_last_version && !Active()) {
-		/* CTD OBS: pair with CTD Relay first; OBS's wizard is one click away there */
-		QMetaObject::invokeMethod(this, &OBSBasic::CtdFirstRunWelcome, Qt::QueuedConnection);
-	}
+	/* CTD OBS: pair with CTD Relay first on a fresh config (OBS's wizard is one click away there); then, once, the
+	 * plugins installed for OBS Studio, which CTD OBS doesn't load (frontend/ctd/ctd-plugins.cpp). One queued call, so
+	 * the two dialogs come one after the other. */
+	const bool ctdWelcome = !first_run && !has_last_version && !Active();
+	QMetaObject::invokeMethod(
+		this,
+		[this, ctdWelcome]() {
+			if (ctdWelcome) {
+				CtdFirstRunWelcome();
+			}
+			CtdStockPluginsNotice(true);
+		},
+		Qt::QueuedConnection);
 
 #if (defined(_WIN32) || defined(__APPLE__)) && (OBS_RELEASE_CANDIDATE > 0 || OBS_BETA > 0)
 	/* Automatically set branch to "beta" the first time a pre-release build is run. */

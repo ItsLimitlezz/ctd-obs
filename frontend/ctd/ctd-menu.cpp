@@ -9,7 +9,8 @@
                                           there is no "CTD Hub")
         CTD Settings…                     OBS Settings, on its CTD page
         Check for Updates…                CTD OBS's update check (ctd-update.cpp)
-        Advanced ▸ Plugin Manager… · Scripts… · WebSocket Server Settings…
+        Advanced ▸ Plugin Manager… · Plugins from OBS Studio… · Scripts… ·
+                   WebSocket Server Settings…
 
     The menu is rebuilt each time it opens, so it follows whichever docks and
     tools the modules have registered (none of them are required).
@@ -152,6 +153,10 @@ void OBSBasic::CtdMenuRebuild()
 	/* Gap 19: OBS's own advanced tools, linked here so CTD users find them next to the CTD items */
 	QMenu *advanced = ctdMenu->addMenu(QTStr("CTD.Menu.Advanced"));
 	advanced->addAction(ui->actionOpenPluginManager);
+	/* frontend/ctd/ctd-plugins.cpp: plugins installed for OBS Studio, which CTD OBS doesn't load */
+	QAction *stockPlugins = advanced->addAction(QTStr("CTD.Menu.StockPlugins"));
+	stockPlugins->setMenuRole(QAction::NoRole);
+	connect(stockPlugins, &QAction::triggered, this, [this]() { CtdStockPluginsNotice(false); });
 	if (QAction *scripts = FindToolsAction(ui->menuTools, "frontend-tools", "Scripts")) {
 		advanced->addAction(scripts);
 	}

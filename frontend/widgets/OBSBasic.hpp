@@ -1705,6 +1705,15 @@ public:
 	void CtdShowRelayPairing();
 
 	/* -------------------------------------
+	 * MARK: - CTD plugins installed for OBS Studio (frontend/ctd/ctd-plugins.cpp)
+	 * -------------------------------------
+	 */
+public:
+	/* Lists the plugins installed for OBS Studio (not loaded in CTD OBS), each with Copy into CTD OBS. atLaunch:
+	 * only logs them, and shows the list once, the first time any are found (never for automated launches). */
+	void CtdStockPluginsNotice(bool atLaunch);
+
+	/* -------------------------------------
 	 * MARK: - CTD Show Profiles (frontend/ctd/ctd-show-api.cpp)
 	 * -------------------------------------
 	 */

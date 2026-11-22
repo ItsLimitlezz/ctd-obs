@@ -91,6 +91,12 @@ jobs:
           cmake --build build_ctd_update_test
           ctest --test-dir build_ctd_update_test --output-on-failure
 
+      - name: Plugin folder tests
+        run: |
+          cmake -S test/ctd-plugins -B build_ctd_plugins_test
+          cmake --build build_ctd_plugins_test
+          ctest --test-dir build_ctd_plugins_test --output-on-failure
+
   windows:
     name: Windows
     needs: setup
