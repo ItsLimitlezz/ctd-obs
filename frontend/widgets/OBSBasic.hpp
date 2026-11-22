@@ -1730,6 +1730,8 @@ public:
 	 */
 private:
 	QPointer<QMenu> ctdMenu;
+	/* what the CTD menu was last built from (CtdMenuRebuild) */
+	std::vector<const void *> ctdMenuSignature;
 
 	void CtdMenuInit();
 	void CtdMenuRebuild();

@@ -1276,6 +1276,8 @@ void OBSBasic::OBSInit()
 void OBSBasic::OnFirstLoad()
 {
 	CtdShowFinishLoading();
+	/* CTD OBS: every module has registered its docks and Tools items by now */
+	CtdMenuRebuild();
 
 	OnEvent(OBS_FRONTEND_EVENT_FINISHED_LOADING);
 

@@ -11,8 +11,10 @@
         Check for Updates…                CTD OBS's update check (ctd-update.cpp)
         Advanced ▸ Plugin Manager… · Scripts… · WebSocket Server Settings…
 
-    The menu is rebuilt each time it opens, so it follows whichever docks and
-    tools the modules have registered (none of them are required).
+    The menu is built when CTD OBS has finished loading, and again when it opens
+    only if the docks or tools the modules registered have changed (none of them
+    are required); it is never rebuilt while macOS updates the menu bar for
+    nothing.
 
     Global procs (obs_get_proc_handler()):
 
@@ -41,6 +43,8 @@
 #include <QDockWidget>
 #include <QMenu>
 #include <QMenuBar>
+
+#include <vector>
 
 /* Dock ids of CTD OBS's built-in modules, in menu order. These are the modules' saved dock ids; never rename them
  * ("ctd-hub" is the CTD Relay · Feeds dock: the id is from before it was renamed, so saved layouts keep working;
@@ -104,6 +108,27 @@ void OBSBasic::CtdMenuRebuild()
 		return;
 	}
 
+	/* macOS: AppKit asks for this menu (aboutToShow) not only when it opens but while it updates the menu bar
+	 * (fullscreen, minimize, app switches, shortcut lookups). Clearing it and deleting its submenu each time changes
+	 * an NSMenu that AppKit may be walking. So rebuild only when what it shows has changed: the docks, the Tools
+	 * actions it links and whether the CTD plugin is loaded. Normally that is once, when CTD OBS has finished
+	 * loading (OnFirstLoad). */
+	QAction *scriptsAction = FindToolsAction(ui->menuTools, "frontend-tools", "Scripts");
+	QAction *websocketAction = FindToolsAction(ui->menuTools, "obs-websocket", "OBSWebSocket.Settings.DialogTitle");
+	std::vector<const void *> signature;
+	for (const char *id : kCtdMenuDocks) {
+		QDockWidget *dock = findChild<QDockWidget *>(QString::fromLatin1(id));
+		signature.push_back(dock ? dock->toggleViewAction() : nullptr);
+	}
+	signature.push_back(ui->actionOpenPluginManager);
+	signature.push_back(scriptsAction);
+	signature.push_back(websocketAction);
+	signature.push_back(obs_get_module(kCtdPluginModule));
+	if (!ctdMenu->isEmpty() && signature == ctdMenuSignature) {
+		return;
+	}
+	ctdMenuSignature = std::move(signature);
+
 	/* clear() deletes only the actions this menu owns (the ones created below), not the docks' or Tools'; the old
 	 * Advanced submenu goes separately (it holds only borrowed actions) */
 	for (QMenu *submenu : ctdMenu->findChildren<QMenu *>(Qt::FindDirectChildrenOnly)) {
@@ -152,11 +177,11 @@ void OBSBasic::CtdMenuRebuild()
 	/* Gap 19: OBS's own advanced tools, linked here so CTD users find them next to the CTD items */
 	QMenu *advanced = ctdMenu->addMenu(QTStr("CTD.Menu.Advanced"));
 	advanced->addAction(ui->actionOpenPluginManager);
-	if (QAction *scripts = FindToolsAction(ui->menuTools, "frontend-tools", "Scripts")) {
-		advanced->addAction(scripts);
+	if (scriptsAction) {
+		advanced->addAction(scriptsAction);
 	}
-	if (QAction *websocket = FindToolsAction(ui->menuTools, "obs-websocket", "OBSWebSocket.Settings.DialogTitle")) {
-		advanced->addAction(websocket);
+	if (websocketAction) {
+		advanced->addAction(websocketAction);
 	}
 }
 
