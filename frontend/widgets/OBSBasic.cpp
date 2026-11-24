@@ -932,6 +932,7 @@ void OBSBasic::OBSInit()
 	CtdConfigRegisterProcs(); /* before modules load: they move their settings into the CTD folder */
 	CtdShowRegisterProcs();
 	CtdMenuInit();
+	CtdNdiInit();
 	CtdUpdateInit();
 
 	CtdSplashSetStage(CtdSplashStage::Plugins);

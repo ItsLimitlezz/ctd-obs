@@ -45,71 +45,38 @@ Each plugin has **Copy into CTD OBS**:
 You can also install a plugin for CTD OBS by hand: put it in CTD OBS's folder (table above). **Open CTD OBS's Plugin
 Folder** in the list opens that folder.
 
-## NDI (DistroAV)
+## NDI
 
-CTD OBS does **not** bundle NDI. To use NDI, install [DistroAV](https://github.com/DistroAV/DistroAV) (GPL-2.0) and the
-NDI Runtime, then copy DistroAV into CTD OBS.
+CTD OBS does **not** bundle NDI, and **DistroAV is not the supported route**. NDI is built into CTD OBS as the CTD
+NDI output (the core module `ctd-ndi`; spec: [ndi.md](./ndi.md)).
 
-Versions for CTD OBS (OBS 33.0.x):
+- **What it sends:** the program, the vertical canvas, or any source, scene or group, each as its own NDI sender (the
+  **NDI® Output** filter). CTD OBS only sends NDI; it doesn't receive it.
+- **Turning it on:** Settings ▸ CTD ▸ NDI ▸ **Send**. It's off by default.
+- **What it needs:** the official **NDI 6 Runtime**, once, never NDI Tools. CTD OBS checks the Runtime's library
+  against its allow-list and loads only its own verified copy.
 
-| | macOS (Apple Silicon) | Windows x64 |
-|---|---|---|
-| DistroAV | **6.2.2** (`distroav-6.2.2-macos-universal.pkg`) | **6.2.2** (`distroav-6.2.2-windows-x64` installer or zip) |
-| NDI Runtime | **NDI 6 Runtime for Apple, 6.3 or later** (installs `/usr/local/lib/libndi.dylib`) | **NDI 6 Runtime, 6.3 or later** |
+**Plugin isolation doesn't cover NDI's system components.** On macOS, the NDI Tools installer (not the plain NDI
+Runtime) puts system-wide parts in place:
 
-- DistroAV 6.2.x needs OBS 31.1.1 or later and NDI 6.3.0 or later. 6.2.2 (October 2026) is the first release built
-  for OBS 33's plugin layout.
-- 6.1.x and older need older NDI runtimes, and 5.x needs NDI 5. Don't use them with CTD OBS.
-- If the runtime is missing, too old or can't start, DistroAV logs an error (`ERR-401`…`ERR-406`, `ERR-425`), shows a
-  dialog and stays off (no NDI sources or outputs). It doesn't crash. Install or update the runtime and restart.
-
-**Plugin isolation doesn't cover NDI's system components.** On macOS, the NDI Runtime and NDI Tools installers
-also put system-wide parts in place:
-- an audio driver in `/Library/Audio/Plug-Ins/HAL`;
-- a camera plugin, `NDI Virtual Input`, in `/Library/CoreMediaIO/Plug-Ins/DAL`;
-- apps, such as Access Manager and Monitor.
+- an audio driver in `/Library/Audio/Plug-Ins/HAL`
+- a camera plugin, `NDI Virtual Input`, in `/Library/CoreMediaIO/Plug-Ins/DAL`
+- apps, such as Access Manager and Monitor
 
 macOS loads these into **every** app that lists audio devices or cameras, including CTD OBS. That happens whatever
 CTD OBS's plugin folders contain. On 2026-11-22 they caused CTD OBS on macOS to freeze and crash about every 15
 minutes, with GPU memory growing to about 17 GB. Removing NDI's audio driver, DAL plugins and apps, plus DistroAV,
-and rebooting fixed it. Install only the **NDI Runtime** that DistroAV needs, not the full NDI Tools. If CTD OBS
-freezes or its memory grows after an NDI install, remove those components and reboot first.
+and rebooting fixed it.
 
-Steps:
+Install only the **NDI 6 Runtime**, not NDI Tools. Settings ▸ CTD ▸ NDI warns when NDI Tools' pieces are installed.
+If CTD OBS freezes or its memory grows after an NDI install, remove those components and reboot first.
 
-1. Install the NDI Runtime (above). On macOS, the NDI 6 Runtime for Apple installer; on Windows the NDI 6 Runtime
-   installer (or `winget install NDI.NDIRuntime`).
-2. Install DistroAV 6.2.2 for OBS Studio as usual. Its installers only install for OBS Studio: macOS into
-   `~/Library/Application Support/obs-studio/plugins/distroav.plugin`, Windows into
-   `C:\ProgramData\obs-studio\plugins\distroav`.
-3. Open CTD OBS → **CTD ▸ Advanced ▸ Plugins from OBS Studio…** → **Copy into CTD OBS** next to **distroav**. Then
-   restart CTD OBS.
-4. macOS 15 and later: allow **Local Network** for **CTD OBS** when asked (System Settings ▸ Privacy & Security ▸ Local
-   Network). CTD OBS has its own permissions, separate from OBS Studio's. Without it, NDI sources don't show up.
-5. If CTD OBS and OBS Studio run at the same time, give CTD OBS's NDI output (**Tools ▸ DistroAV NDI Settings**) a
-   different name from OBS Studio's. Two senders with the same name make DistroAV's output fail to start (older
-   versions crashed on exit because of it).
+**DistroAV:** don't copy it into CTD OBS with **Plugins from OBS Studio…**.
 
-To turn NDI off again: **CTD ▸ Advanced ▸ Plugin Manager** → untick **DistroAV** → restart. You can also delete
-`distroav.plugin` / `distroav` from CTD OBS's folder; OBS Studio's copy stays.
+- It loads NDI from system folders.
+- Its preview output and NDI filter stall the GPU on every frame.
+- It has an update check that sends OBS's install ID to distroav.org.
 
-### Why not built in
-
-We looked at building DistroAV into CTD OBS's CI, as with the vertical canvas, and decided against it for now:
-
-- It has no in-tree build: we would have to keep a fork.
-- Its update check (when the user turns it on) sends OBS's install ID, versions and a hash of the plugin to
-  distroav.org. We would have to remove that.
-- Shipping NDI features adds NDI's licence obligations (an ndi.video link next to the NDI features, NDI's trademark
-  line in About).
-- We would become the support contact for NDI crashes.
-
-DistroAV 6.2.2 already runs on OBS 33, so a CTD build would not be more compatible. We'll revisit this if a crash report
-shows an ABI problem with the released build.
-
-DistroAV's own known issues worth checking when NDI misbehaves:
-
-- [#1215](https://github.com/DistroAV/DistroAV/issues/1215) (Apple Silicon): a crash in NDI's video thread after about
-  13 minutes when an old Homebrew FFmpeg (before 7) was installed. Upgrade it.
-- [#1335](https://github.com/DistroAV/DistroAV/issues/1335): a crash on exit when the NDI output couldn't start (fixed
-  in 6.2.0).
+[ndi.md](./ndi.md) has the full comparison. If an older setup has it in CTD OBS's plugin folder, turn it off in
+**CTD ▸ Advanced ▸ Plugin Manager** (untick **DistroAV**, restart) or delete `distroav.plugin` / `distroav` from CTD
+OBS's folder; OBS Studio's copy stays.

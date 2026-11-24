@@ -114,7 +114,8 @@ in the menus.
 ## What is and isn't in the macOS build
 
 In: CTD Relay and CTD Relay · Feeds docks, Send stream (main + vertical), the vertical canvas, Show Profiles, the CTD menu and
-Settings ▸ CTD, CTD Night theme, browser sources, WebSocket server.
+Settings ▸ CTD, CTD Night theme, browser sources, WebSocket server. NDI® send (program, vertical, any source), off until turned on in
+Settings ▸ CTD ▸ NDI; it needs only the NDI 6 Runtime, **never NDI Tools** ([ndi.md](./ndi.md)).
 
 Not in, or untested:
 

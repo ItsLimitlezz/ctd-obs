@@ -24,6 +24,8 @@
 
 #include <QPointer>
 
+#include <vector>
+
 #define VOLUME_METER_DECAY_FAST 23.53
 #define VOLUME_METER_DECAY_MEDIUM 11.76
 #define VOLUME_METER_DECAY_SLOW 8.57
@@ -32,6 +34,9 @@ class Auth;
 class OBSBasic;
 class OBSHotkeyWidget;
 class OBSPropertiesView;
+class QLabel;
+class QTreeWidget;
+class QVBoxLayout;
 struct FFmpegFormat;
 struct OBSTheme;
 
@@ -232,7 +237,18 @@ private:
 	bool ctdChanged = false;
 	QCheckBox *ctdUpdateAuto = nullptr;
 	QComboBox *ctdUpdateChannel = nullptr;
+	/* NDI (docs/ctd/ndi.md) */
+	QComboBox *ctdNdiMode = nullptr;
+	QLabel *ctdNdiStatus = nullptr;
+	QLabel *ctdNdiWarning = nullptr;
+	QTreeWidget *ctdNdiOutputs = nullptr;
+	/* the NDI Output filters in ctdNdiOutputs, by row (after the program and vertical rows) */
+	std::vector<OBSWeakSource> ctdNdiFilterRows;
 	void CtdInitPage();
+	void CtdInitNdiSection(QWidget *body, QVBoxLayout *layout);
+	void CtdNdiRefreshStatus();
+	void CtdNdiFillOutputs();
+	void CtdNdiSaveOutputs();
 	void CtdSaveSettings();
 
 public:

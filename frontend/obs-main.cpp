@@ -84,6 +84,10 @@ string opt_starting_scene;
 
 bool restart = false;
 bool restart_safe = false;
+/* CTD OBS: --ctd-no-ndi starts with NDI off for this launch; CTD ▸ NDI ▸ Start without NDI… restarts that way
+ * (docs/ctd/ndi.md, frontend/ctd/ctd-ndi.cpp) */
+bool ctd_opt_no_ndi = false;
+bool ctd_restart_no_ndi = false;
 static QStringList arguments;
 
 string CurrentTimeString()
@@ -729,6 +733,9 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 		} else {
 			arguments.removeAll("--safe-mode");
 		}
+		if (ctd_restart_no_ndi && !arguments.contains("--ctd-no-ndi")) {
+			arguments.append("--ctd-no-ndi");
+		}
 	}
 
 	return ret;
@@ -1044,6 +1051,9 @@ int main(int argc, char *argv[])
 			opt_disable_updater = true;
 			ctd_opt_no_update_check = true;
 
+		} else if (arg_is(argv[i], "--ctd-no-ndi", nullptr)) {
+			ctd_opt_no_ndi = true;
+
 		} else if (arg_is(argv[i], "--disable-missing-files-check", nullptr)) {
 			opt_disable_missing_files_check = true;
 
@@ -1073,7 +1083,8 @@ int main(int argc, char *argv[])
 				"--always-on-top: Start in 'always on top' mode.\n\n"
 				"--unfiltered_log: Make log unfiltered.\n\n"
 				"--disable-updater: Disable built-in updater (Windows/Mac only)\n\n"
-				"--disable-missing-files-check: Disable the missing files dialog which can appear on startup.\n\n";
+				"--disable-missing-files-check: Disable the missing files dialog which can appear on startup.\n\n"
+				"--ctd-no-ndi: Start with NDI off for this launch, whatever Settings > CTD > NDI says.\n\n";
 
 #ifdef _WIN32
 			MessageBoxA(NULL, help.c_str(), "Help", MB_OK | MB_ICONASTERISK);

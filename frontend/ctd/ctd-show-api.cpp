@@ -32,6 +32,7 @@
 #include <QMenu>
 
 #include <array>
+#include <cstring>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -314,6 +315,12 @@ bool OBSBasic::CtdAnyOutputActive()
 	bool active = false;
 	obs_enum_outputs(
 		[](void *param, obs_output_t *output) {
+			/* NDI sends (plugins/ctd-ndi) stop by themselves around profile / collection switches and exit, so
+			 * they never hold a switch or an update (docs/ctd/ndi.md) */
+			const char *id = obs_output_get_id(output);
+			if (id && (strcmp(id, "ctd_ndi_output") == 0 || strcmp(id, "ctd_ndi_source_output") == 0)) {
+				return true;
+			}
 			if (obs_output_active(output)) {
 				*static_cast<bool *>(param) = true;
 				return false;

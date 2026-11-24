@@ -1753,6 +1753,20 @@ public:
 	bool ctdSettingsOpenOnCtdPage = false;
 
 	/* -------------------------------------
+	 * MARK: - CTD NDI (frontend/ctd/ctd-ndi.cpp, docs/ctd/ndi.md)
+	 * -------------------------------------
+	 */
+private:
+	/* the memory watchdog (frontend/ctd/ctd-memory-watchdog.cpp); a child QObject, deleted with the window */
+	QObject *ctdWatchdog = nullptr;
+
+	void CtdNdiInit();
+
+public:
+	void CtdNdiAddMenu(QMenu *menu);
+	void CtdNdiStartWithout();
+
+	/* -------------------------------------
 	 * MARK: - CTD updates (frontend/ctd/ctd-update.cpp)
 	 * -------------------------------------
 	 */
