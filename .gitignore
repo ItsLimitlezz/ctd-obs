@@ -32,6 +32,8 @@
 !COPYING
 !INSTALL
 !README.rst
+!CTD-CHANGES.md
+!CTD-VERSION
 
 # Exclude lock files
 *.lock.json

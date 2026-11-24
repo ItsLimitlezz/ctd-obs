@@ -50,15 +50,27 @@ add_core_module(
 )
 add_core_module(aja-output-ui PLATFORMS WINDOWS MACOS LINUX WITH_MESSAGE)
 add_core_module(coreaudio-encoder PLATFORMS WINDOWS MACOS)
-add_core_module(ctd-live-source PLATFORMS WINDOWS)
+add_core_module(ctd-live-source PLATFORMS WINDOWS MACOS)
 # CTD OBS: the vertical canvas (submodule ctd-vertical-canvas) builds the module 'vertical-canvas', the name the core
 # module loader looks for
-if(OS_WINDOWS)
+if(OS_WINDOWS OR OS_MACOS)
   if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ctd-vertical-canvas/CMakeLists.txt")
     message(FATAL_ERROR "Required submodule 'ctd-vertical-canvas' not available.")
   endif()
   add_subdirectory(ctd-vertical-canvas)
   target_enable(vertical-canvas)
+endif()
+# CTD OBS: the CTD modules are kept warning-free for MSVC (/WX). On macOS, clang's extra warnings (e.g. Qt's foreach
+# deprecation in the vertical canvas) stay in the build log but don't fail the build.
+if(OS_MACOS)
+  foreach(_ctd_target IN ITEMS ctd-live-source ctd-engine vertical-canvas)
+    if(TARGET ${_ctd_target})
+      set_target_properties(
+        ${_ctd_target}
+        PROPERTIES COMPILE_WARNING_AS_ERROR OFF XCODE_ATTRIBUTE_GCC_TREAT_WARNINGS_AS_ERRORS NO
+      )
+    endif()
+  endforeach()
 endif()
 add_core_module(
     decklink

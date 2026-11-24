@@ -1188,6 +1188,7 @@ void OBSApp::AppInit()
 void OBSApp::checkForUncleanShutdown()
 {
 	bool hasUncleanShutdown = crashHandler_->hasUncleanShutdown();
+	ctdUncleanShutdown = hasUncleanShutdown;
 
 	if (hasUncleanShutdown) {
 		/* CTD OBS: never offer to send crash reports to the OBS Project */

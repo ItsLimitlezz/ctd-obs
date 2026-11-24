@@ -7,8 +7,8 @@
 ; Defines passed by the packaging script (makensis /D...):
 ;   STAGING_DIR      Folder with the unpacked package (bin\, core\, data\, ...)
 ;   OUTPUT_FILE      Path of the installer to write
-;   VERSION          Display version, e.g. 33.0.1-abcdef1
-;   VERSION_NUMERIC  Four-part file version, e.g. 33.0.1.42
+;   VERSION          Display version (CTD-VERSION plus the commit for test builds), e.g. 0.10.0-abcdef1
+;   VERSION_NUMERIC  Four-part file version, e.g. 0.10.0.42
 ;   VCAM_DIR         Folder of the virtual camera DLLs relative to the install folder
 ;   VCREDIST_FILE    Path of vc_redist.x64.exe to bundle
 ;   VCREDIST_MINOR   Minor version of that runtime (e.g. 50 for 14.50)
@@ -110,13 +110,26 @@ Var RemoveSettingsCheckbox
 ; ---------------------------------------------------------------------------------------------
 ; Shared helpers
 
+; CTD OBS's own updater (frontend/ctd/ctd-update.cpp) starts this installer and then closes CTD OBS, which can take a
+; few seconds (scene collection saved, plugins unloaded): wait up to ~30 s for it before asking.
+Var AppWaitTries
+
 !macro WaitForAppClosed UN
 Function ${UN}WaitForAppClosed
+  StrCpy $AppWaitTries 0
   check:
     nsExec::ExecToStack 'cmd.exe /c tasklist /FI "IMAGENAME eq ${APP_EXE}" /NH | find /I "${APP_EXE}"'
     Pop $0
     Pop $1
     ${If} $0 == 0
+      ${If} $AppWaitTries < 60
+        ${If} $AppWaitTries == 0
+          DetailPrint "Waiting for ${APP_NAME} to close..."
+        ${EndIf}
+        IntOp $AppWaitTries $AppWaitTries + 1
+        Sleep 500
+        Goto check
+      ${EndIf}
       ; Silent runs stop here (default answer Cancel) instead of closing the user's work.
       MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "${APP_NAME} is running. Close it, then click Retry." /SD IDCANCEL IDRETRY check
       Abort

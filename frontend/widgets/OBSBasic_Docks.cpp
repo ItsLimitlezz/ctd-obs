@@ -21,6 +21,9 @@
 
 #include <qt-wrappers.hpp>
 
+#include <algorithm>
+#include <utility>
+
 void setupDockAction(QDockWidget *dock)
 {
 	QAction *action = dock->toggleViewAction();
@@ -43,12 +46,129 @@ void setupDockAction(QDockWidget *dock)
 	QObject::connect(action, &QAction::enabledChanged, action, neverDisable);
 }
 
+/* CTD OBS: dock ids of CTD OBS's built-in modules (CTD plugin, vertical canvas). They're part of the app: Reset UI
+ * doesn't warn about them and docks them like OBS's own. These are the modules' saved dock ids; never rename them. */
+static const char *const kCtdRelayDock = "ctd-multistream";
+static const char *const kCtdFeedsDock = "ctd-hub";
+static const char *const kCtdProducerDock = "ctd_producer";
+static const char *const kCtdOverlaysDock = "ctd-overlays";
+static const char *const kCtdVerticalDock = "VerticalCanvasDock";
+static const char *const kCtdVerticalScenesDock = "VerticalCanvasDockScenes";
+static const char *const kCtdVerticalSourcesDock = "VerticalCanvasDockSources";
+static const char *const kCtdVerticalTransitionsDock = "VerticalCanvasDockTransitions";
+
+bool OBSBasic::IsCtdBuiltInDock(const QString &name)
+{
+	for (const char *id : {kCtdRelayDock, kCtdFeedsDock, kCtdProducerDock, kCtdOverlaysDock, kCtdVerticalDock,
+			       kCtdVerticalScenesDock, kCtdVerticalSourcesDock, kCtdVerticalTransitionsDock}) {
+		if (name == QLatin1String(id)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+QDockWidget *OBSBasic::FindExtraDock(const char *name) const
+{
+	for (const std::shared_ptr<QDockWidget> &dock : extraDocks) {
+		if (dock && dock->objectName() == QLatin1String(name)) {
+			return dock.get();
+		}
+	}
+	return nullptr;
+}
+
+/* CTD OBS: the vertical canvas on the right with its Scenes / Sources / Transitions docks under OBS's own (where the
+ * vertical canvas puts them on its first run), CTD Relay docked right of it and visible, CTD Relay · Feeds tabbed behind Relay */
+void OBSBasic::ResetCtdDocks()
+{
+	QDockWidget *vertical = FindExtraDock(kCtdVerticalDock);
+	QDockWidget *relay = FindExtraDock(kCtdRelayDock);
+	QDockWidget *hub = FindExtraDock(kCtdFeedsDock);
+
+	if (vertical) {
+		vertical->setFloating(false);
+		addDockWidget(Qt::RightDockWidgetArea, vertical);
+		vertical->setVisible(true);
+
+		const std::pair<const char *, QDockWidget *> companions[] = {
+			{kCtdVerticalScenesDock, ui->scenesDock},
+			{kCtdVerticalSourcesDock, ui->sourcesDock},
+			{kCtdVerticalTransitionsDock, ui->transitionsDock},
+		};
+		for (const auto &[id, beside] : companions) {
+			QDockWidget *dock = FindExtraDock(id);
+			if (!dock) {
+				continue;
+			}
+			dock->setFloating(false);
+			const Qt::DockWidgetArea area = beside ? dockWidgetArea(beside) : Qt::NoDockWidgetArea;
+			if (area == Qt::NoDockWidgetArea || beside->isFloating()) {
+				addDockWidget(Qt::RightDockWidgetArea, dock);
+				splitDockWidget(vertical, dock, Qt::Horizontal);
+			} else {
+				addDockWidget(area, dock);
+				splitDockWidget(beside, dock, Qt::Vertical);
+			}
+			dock->setVisible(true);
+		}
+	}
+
+	if (relay) {
+		relay->setFloating(false);
+		addDockWidget(Qt::RightDockWidgetArea, relay);
+		if (vertical) {
+			splitDockWidget(vertical, relay, Qt::Horizontal);
+		}
+		relay->setVisible(true);
+	}
+
+	if (hub) {
+		hub->setFloating(false);
+		addDockWidget(Qt::RightDockWidgetArea, hub);
+		if (relay) {
+			tabifyDockWidget(relay, hub);
+		}
+		hub->setVisible(true);
+	}
+
+	/* CTD Producer (viewers per platform, merged chat): a tab beside CTD Relay, which stays the one in front */
+	if (QDockWidget *producer = FindExtraDock(kCtdProducerDock)) {
+		producer->setFloating(false);
+		addDockWidget(Qt::RightDockWidgetArea, producer);
+		if (relay) {
+			tabifyDockWidget(relay, producer);
+		}
+		producer->setVisible(true);
+	}
+
+	/* CTD Overlays (CTD Overlay's overlays, updates, the template kit): a tab beside CTD Relay too */
+	if (QDockWidget *overlays = FindExtraDock(kCtdOverlaysDock)) {
+		overlays->setFloating(false);
+		addDockWidget(Qt::RightDockWidgetArea, overlays);
+		if (relay) {
+			tabifyDockWidget(relay, overlays);
+		}
+		overlays->setVisible(true);
+	}
+
+	if (relay) {
+		relay->raise();
+		resizeDocks({relay}, {std::min(width() * 25 / 100, 340)}, Qt::Horizontal);
+	}
+}
+
 void OBSBasic::on_resetDocks_triggered(bool force)
 {
+	/* CTD OBS: only docks from outside CTD OBS (other plugins, custom browser docks) are worth the warning */
+	const bool thirdPartyDocks = std::any_of(extraDocks.begin(), extraDocks.end(),
+						 [](const std::shared_ptr<QDockWidget> &dock) {
+							 return dock && !IsCtdBuiltInDock(dock->objectName());
+						 });
 #ifdef BROWSER_AVAILABLE
-	if ((extraDocks.size() || extraCustomDocks.size() || extraBrowserDocks.size()) && !force)
+	if ((thirdPartyDocks || extraCustomDocks.size() || extraBrowserDocks.size()) && !force)
 #else
-	if ((extraDocks.size() || extraCustomDocks.size()) && !force)
+	if ((thirdPartyDocks || extraCustomDocks.size()) && !force)
 #endif
 	{
 		QMessageBox::StandardButton button =
@@ -97,6 +217,8 @@ void OBSBasic::on_resetDocks_triggered(bool force)
 
 	int sideDockWidth = std::min(width() * 30 / 100, 280);
 	resizeDocks({ui->scenesDock, ui->sourcesDock}, {sideDockWidth, sideDockWidth}, Qt::Horizontal);
+
+	ResetCtdDocks();
 
 	activateWindow();
 }

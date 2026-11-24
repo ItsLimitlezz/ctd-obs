@@ -1,6 +1,7 @@
 #include "OBSAbout.hpp"
 
 #include <widgets/OBSBasic.hpp>
+#include <ctd/ctd-version.hpp>
 #include <utility/RemoteTextThread.hpp>
 
 #include <qt-wrappers.hpp>
@@ -25,9 +26,9 @@ OBSAbout::OBSAbout(QWidget *parent) : QDialog(parent), ui(new Ui::OBSAbout)
 		bitness = " (64 bit)";
 	}
 
-	QString ver = obs_get_version_string();
+	QString ver = QString::fromStdString(CtdVersionString());
 
-	ui->version->setText(ver + bitness);
+	ui->version->setText(ver + bitness + "\n" + QTStr("About.BasedOn").arg(CtdBaseObsVersion()));
 
 	/* CTD OBS: no OBS donate / "Get Involved" links (they point at the OBS Project) */
 	ui->contribute->hide();

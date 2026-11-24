@@ -12,7 +12,9 @@ void OBSBasicSettings::InitAppearancePage()
 
 	for (const OBSTheme &theme : App()->GetThemes()) {
 		if (theme.isBaseTheme && (HighContrastEnabled() || theme.isVisible || theme.id == currentBaseTheme)) {
-			ui->theme->addItem(theme.name, theme.id);
+			/* CTD OBS: Yami is only the base of the CTD themes here, so it is listed as CTD */
+			ui->theme->addItem(theme.id == "com.obsproject.Yami" ? QStringLiteral("CTD") : theme.name,
+					   theme.id);
 		}
 	}
 

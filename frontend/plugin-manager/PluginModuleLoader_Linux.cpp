@@ -34,13 +34,16 @@
 //     * Binary: <Environment Variable>/<Plugin>/<Plugin>.so
 //     * Data: <Environment Variable>/<Plugin>/data
 //
+// CTD OBS: the system and legacy system paths are skipped when CTD OBS is installed to /usr or /usr/local, where
+// they are OBS Studio's (kSharesObsStudioPrefix).
+//
 // * System Root Path: /usr
 //     * Binary: <System Root Path>/<System Library>/obs-modules/plugins/<Plugin>.so
 //     * Data: <System Root Path>/share/obs/obs-modules/plugins/<Plugin>
 //
 // * User Root Path: $XDG_DATA_HOME
-//     * Binary: <User Root Path>/obs-studio/plugins/<Plugin>/<Plugin>.so
-//     * Data: <User Root Path>/obs-studio/plugins/<Plugin>/data
+//     * Binary: <User Root Path>/ctd-obs/plugins/<Plugin>/<Plugin>.so
+//     * Data: <User Root Path>/ctd-obs/plugins/<Plugin>/data
 //
 // * Legacy User Path: <Environment Variable> + <Environment Data Variable>
 //     * Binary: <Environment Variable>/<Plugin>.so
@@ -51,8 +54,8 @@
 //     * Data: <Legacy System Root Path>/share/obs/obs-plugins/<Plugin>
 //
 // * Legacy User Root Path: $XDG_CONFIG_HOME
-//     * Binary: <Legacy User Root Path>/obs-studio/plugins/<Plugin>/bin/64bit/<Plugin>.so
-//     * Data: <Legacy User Root Path>/obs-studio/plugins/<Plugin>/data
+//     * Binary: <Legacy User Root Path>/ctd-obs/plugins/<Plugin>/bin/64bit/<Plugin>.so
+//     * Data: <Legacy User Root Path>/ctd-obs/plugins/<Plugin>/data
 //
 // * Legacy Fallback Path: <OBS Binary Location>
 //     * Binary: <Legacy Fallback Path>/../../obs-plugins/64bit/<Plugin>.so
@@ -65,13 +68,21 @@ namespace Constants = OBS::Constants;
 
 constexpr std::string_view kModulePathSuffix{"/%module%/"};
 constexpr std::string_view kModuleDataPathSuffix{"/%module%/data/"};
-constexpr std::string_view kXdgBinaryPath{"/obs-studio/plugins/%module%/"};
-constexpr std::string_view kXdgDataPath{"/obs-studio/plugins/%module%/data/"};
+constexpr std::string_view kXdgBinaryPath{"/ctd-obs/plugins/%module%/"};
+constexpr std::string_view kXdgDataPath{"/ctd-obs/plugins/%module%/data/"};
 
-constexpr std::string_view kLegacyXdgBinaryPath{"/obs-studio/plugins/%module%/bin/64bit"};
-constexpr std::string_view kLegacyXdgDataPath{"/obs-studio/plugins/%module%/data"};
+constexpr std::string_view kLegacyXdgBinaryPath{"/ctd-obs/plugins/%module%/bin/64bit"};
+constexpr std::string_view kLegacyXdgDataPath{"/ctd-obs/plugins/%module%/data"};
 
-constexpr bool hasSystemPluginPath = !Constants::kPlatformPluginModulePath.empty() &&
+// CTD OBS: third-party plugins load only from CTD OBS's own folders. OBS Studio's system-wide plugin folders (a
+// CTD OBS installed to /usr or /usr/local shares them with OBS Studio's packages) are never searched; a CTD OBS
+// installed under its own prefix (e.g. /opt/ctd-obs) keeps its system plugin folders, which are then its own.
+constexpr bool kSharesObsStudioPrefix =
+	Constants::kPlatformInstallPath == "/usr/" || Constants::kPlatformInstallPath == "/usr//" ||
+	Constants::kPlatformInstallPath == "/usr/local/" || Constants::kPlatformInstallPath == "/usr/local//" ||
+	Constants::kPlatformInstallPath == "/";
+
+constexpr bool hasSystemPluginPath = !kSharesObsStudioPrefix && !Constants::kPlatformPluginModulePath.empty() &&
 				     !Constants::kPlatformPluginDataPath.empty();
 
 namespace {
@@ -175,9 +186,9 @@ State PluginManager::loadLegacyPlugins(bool usePortableMode)
 		userPluginState = State::Success;
 	}
 
-	State systemPluginState = State::Failure;
+	State systemPluginState = State::Success;
 
-	{
+	if constexpr (!kSharesObsStudioPrefix) {
 		std::string binaryPath{Constants::kPlatformInstallPath};
 		std::string dataPath{Constants::kPlatformInstallPath};
 		binaryPath.append(Constants::kPlatformLibraryPath);

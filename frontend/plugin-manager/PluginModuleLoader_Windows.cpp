@@ -39,8 +39,8 @@
 //     * Data: <Environment Variable>/<Plugin>/data
 //
 // * Root Path: C:/ProgramData
-//     * Binary: <Root Path>/obs-studio/plugins/<Plugin>/<Plugin>.dll
-//     * Data: <Root Path>/obs-studio/plugins/<Plugin>/data
+//     * Binary: <Root Path>/ctd-obs/plugins/<Plugin>/<Plugin>.dll
+//     * Data: <Root Path>/ctd-obs/plugins/<Plugin>/data
 //
 // * Portable Root Path: <OBS Binary Location>
 //     * Binary: <Portable Root Path>/../../plugins/<Plugin>/<Plugin>.dll
@@ -59,8 +59,11 @@
 //     * Data: <Legacy Root Path>/../../data/obs-plugins/<Plugin>
 //
 // * Legacy System Path: C:/ProgramData
-//     * Binary: <Legacy System Path>/obs-studio/plugins/<Plugin>/bin/<Plugin>.dll
-//     * Data: <Legacy System Path>/obs-studio/plugins/<Plugin>/data
+//     * Binary: <Legacy System Path>/ctd-obs/plugins/<Plugin>/bin/64bit/<Plugin>.dll
+//     * Data: <Legacy System Path>/ctd-obs/plugins/<Plugin>/data
+//
+// CTD OBS: never OBS Studio's folders (C:/ProgramData/obs-studio/plugins, its install folder's obs-plugins); the
+// legacy root and portable paths are relative to ctd-obs64.exe, i.e. CTD OBS's own install folder
 //
 
 using State = OBS::PluginManager::State;

@@ -58,6 +58,7 @@ include(cmake/ui-settings.cmake)
 include(cmake/ui-utility.cmake)
 include(cmake/ui-widgets.cmake)
 include(cmake/ctd-show.cmake)
+include(cmake/ctd-version.cmake)
 include(cmake/ui-wizards.cmake)
 
 if(NOT OAUTH_BASE_URL)
@@ -70,6 +71,8 @@ include(cmake/feature-restream.cmake)
 include(cmake/feature-youtube.cmake)
 include(cmake/feature-whatsnew.cmake)
 include(cmake/feature-idian-playground.cmake)
+include(cmake/ctd-first-run.cmake)
+include(cmake/ctd-update.cmake)
 
 configure_file(cmake/templates/ui-config.h.in ui-config.h)
 

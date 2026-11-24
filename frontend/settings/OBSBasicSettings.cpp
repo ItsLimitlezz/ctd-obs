@@ -849,7 +849,12 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 
 	InitStreamPage();
 	InitAppearancePage();
+	CtdInitPage();
 	LoadSettings(false);
+	if (main && main->ctdSettingsOpenOnCtdPage) {
+		main->ctdSettingsOpenOnCtdPage = false;
+		CtdShowPage();
+	}
 
 	ui->advOutTrack1->setAccessibleName(QTStr("Basic.Settings.Output.Adv.Audio.Track1"));
 	ui->advOutTrack2->setAccessibleName(QTStr("Basic.Settings.Output.Adv.Audio.Track2"));
@@ -3781,6 +3786,9 @@ void OBSBasicSettings::SaveSettings()
 	if (appearanceChanged) {
 		SaveAppearanceSettings();
 	}
+	if (ctdChanged) {
+		CtdSaveSettings();
+	}
 	if (videoChanged || advancedChanged) {
 		main->ResetVideo();
 	}
@@ -3817,6 +3825,9 @@ void OBSBasicSettings::SaveSettings()
 		}
 		if (advancedChanged) {
 			AddChangedVal(changed, "advanced");
+		}
+		if (ctdChanged) {
+			AddChangedVal(changed, "ctd");
 		}
 
 		blog(LOG_INFO, "Settings changed (%s)", changed.c_str());

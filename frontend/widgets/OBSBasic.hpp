@@ -48,6 +48,7 @@
 extern volatile bool recording_paused;
 
 class ColorSelect;
+class CtdUpdater;
 class OBSAbout;
 class OBSBasicAdvAudio;
 class OBSBasicFilters;
@@ -453,6 +454,12 @@ private:
 
 	QPointer<OBSDock> controlsDock;
 	QPointer<OBSDock> mixerDock;
+
+	/* CTD OBS: the docks of CTD OBS's built-in modules are laid out like OBS's own */
+	bool ctdDocksFreshLayout = false;
+	static bool IsCtdBuiltInDock(const QString &name);
+	QDockWidget *FindExtraDock(const char *name) const;
+	void ResetCtdDocks();
 
 public:
 	void AddDockWidget(QDockWidget *dock, Qt::DockWidgetArea area, bool extraBrowser = false);
@@ -1693,6 +1700,25 @@ private:
 	void SetBroadcastFlowEnabled(bool enabled);
 
 	/* -------------------------------------
+	 * MARK: - CTD first run (frontend/ctd/ctd-first-run.cpp)
+	 * -------------------------------------
+	 */
+private:
+	void CtdFirstRunWelcome();
+
+public:
+	void CtdShowRelayPairing();
+
+	/* -------------------------------------
+	 * MARK: - CTD plugins installed for OBS Studio (frontend/ctd/ctd-plugins.cpp)
+	 * -------------------------------------
+	 */
+public:
+	/* Lists the plugins installed for OBS Studio (not loaded in CTD OBS), each with Copy into CTD OBS. atLaunch:
+	 * only logs them, and shows the list once, the first time any are found (never for automated launches). */
+	void CtdStockPluginsNotice(bool atLaunch);
+
+	/* -------------------------------------
 	 * MARK: - CTD Show Profiles (frontend/ctd/ctd-show-api.cpp)
 	 * -------------------------------------
 	 */
@@ -1711,6 +1737,32 @@ public:
 			  bool &restartRequired);
 	bool CtdShowRefresh(std::string &error);
 	static bool CtdAnyOutputActive();
+
+	/* -------------------------------------
+	 * MARK: - CTD menu (frontend/ctd/ctd-menu.cpp)
+	 * -------------------------------------
+	 */
+private:
+	QPointer<QMenu> ctdMenu;
+
+	void CtdMenuInit();
+	void CtdMenuRebuild();
+
+public:
+	void CtdOpenSettings();
+	bool ctdSettingsOpenOnCtdPage = false;
+
+	/* -------------------------------------
+	 * MARK: - CTD updates (frontend/ctd/ctd-update.cpp)
+	 * -------------------------------------
+	 */
+private:
+	CtdUpdater *ctdUpdater = nullptr;
+
+	void CtdUpdateInit();
+
+public:
+	void CtdCheckForUpdates();
 
 public:
 #ifdef YOUTUBE_ENABLED
