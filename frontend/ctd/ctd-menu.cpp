@@ -12,7 +12,8 @@
                                           only with a plugin that has it
         CTD Settings…                     OBS Settings, on its CTD page
         Check for Updates…                CTD OBS's update check (ctd-update.cpp)
-        Advanced ▸ Plugin Manager… · Scripts… · WebSocket Server Settings…
+        Advanced ▸ Plugin Manager… · Plugins from OBS Studio… · Scripts… ·
+                   WebSocket Server Settings…
 
     The menu is rebuilt each time it opens, so it follows whichever docks and
     tools the modules have registered (none of them are required).
@@ -54,8 +55,11 @@
 #include <QMenuBar>
 
 /* Dock ids of CTD OBS's built-in modules, in menu order. These are the modules' saved dock ids; never rename them
- * ("ctd-hub" is the CTD Relay · Feeds dock: the id is from before it was renamed, so saved layouts keep working). */
-static const char *const kCtdMenuDocks[] = {"ctd-multistream", "ctd-hub", "VerticalCanvasDock"};
+ * ("ctd-hub" is the CTD Relay · Feeds dock: the id is from before it was renamed, so saved layouts keep working;
+ * "ctd_producer" is the CTD Producer dock: viewers per platform and the merged chat; "ctd-overlays" is the CTD Overlays
+ * dock: CTD Overlay's overlays, template updates and the template kit, through CTD Relay). */
+static const char *const kCtdMenuDocks[] = {"ctd-multistream", "ctd_producer", "ctd-overlays", "ctd-hub",
+					    "VerticalCanvasDock"};
 
 /* The CTD plugin's module (plugins/ctd-live-source) */
 static const char *const kCtdPluginModule = "ctd-live-source";
@@ -178,6 +182,10 @@ void OBSBasic::CtdMenuRebuild()
 	/* Gap 19: OBS's own advanced tools, linked here so CTD users find them next to the CTD items */
 	QMenu *advanced = ctdMenu->addMenu(QTStr("CTD.Menu.Advanced"));
 	advanced->addAction(ui->actionOpenPluginManager);
+	/* frontend/ctd/ctd-plugins.cpp: plugins installed for OBS Studio, which CTD OBS doesn't load */
+	QAction *stockPlugins = advanced->addAction(QTStr("CTD.Menu.StockPlugins"));
+	stockPlugins->setMenuRole(QAction::NoRole);
+	connect(stockPlugins, &QAction::triggered, this, [this]() { CtdStockPluginsNotice(false); });
 	if (QAction *scripts = FindToolsAction(ui->menuTools, "frontend-tools", "Scripts")) {
 		advanced->addAction(scripts);
 	}

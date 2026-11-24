@@ -28,9 +28,11 @@ using FailureInfo = obs_module_failure_info;
 using ModuleLoadInfo = obs_runtime_module_info;
 using ModuleList = std::vector<std::string>;
 
-inline constexpr std::string_view kPathVariable{"OBS_PLUGINS_PATH"};
-inline constexpr std::string_view kLegacyBinaryPathVariable{"OBS_LEGACY_PLUGINS_PATH"};
-inline constexpr std::string_view kLegacyDataPathVariable{"OBS_LEGACY_PLUGINS_DATA_PATH"};
+// CTD OBS: its own variables. OBS Studio's (OBS_PLUGINS_PATH, OBS_LEGACY_PLUGINS_PATH, OBS_LEGACY_PLUGINS_DATA_PATH)
+// point at plugins built for OBS Studio and are ignored, so they can't load into CTD OBS (docs/ctd/plugins.md)
+inline constexpr std::string_view kPathVariable{"CTD_OBS_PLUGINS_PATH"};
+inline constexpr std::string_view kLegacyBinaryPathVariable{"CTD_OBS_LEGACY_PLUGINS_PATH"};
+inline constexpr std::string_view kLegacyDataPathVariable{"CTD_OBS_LEGACY_PLUGINS_DATA_PATH"};
 
 inline std::string getEnvironmentVariable(std::string_view variableName)
 {

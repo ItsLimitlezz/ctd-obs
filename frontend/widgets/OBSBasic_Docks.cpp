@@ -50,6 +50,8 @@ void setupDockAction(QDockWidget *dock)
  * doesn't warn about them and docks them like OBS's own. These are the modules' saved dock ids; never rename them. */
 static const char *const kCtdRelayDock = "ctd-multistream";
 static const char *const kCtdFeedsDock = "ctd-hub";
+static const char *const kCtdProducerDock = "ctd_producer";
+static const char *const kCtdOverlaysDock = "ctd-overlays";
 static const char *const kCtdVerticalDock = "VerticalCanvasDock";
 static const char *const kCtdVerticalScenesDock = "VerticalCanvasDockScenes";
 static const char *const kCtdVerticalSourcesDock = "VerticalCanvasDockSources";
@@ -57,8 +59,8 @@ static const char *const kCtdVerticalTransitionsDock = "VerticalCanvasDockTransi
 
 bool OBSBasic::IsCtdBuiltInDock(const QString &name)
 {
-	for (const char *id : {kCtdRelayDock, kCtdFeedsDock, kCtdVerticalDock, kCtdVerticalScenesDock,
-			       kCtdVerticalSourcesDock, kCtdVerticalTransitionsDock}) {
+	for (const char *id : {kCtdRelayDock, kCtdFeedsDock, kCtdProducerDock, kCtdOverlaysDock, kCtdVerticalDock,
+			       kCtdVerticalScenesDock, kCtdVerticalSourcesDock, kCtdVerticalTransitionsDock}) {
 		if (name == QLatin1String(id)) {
 			return true;
 		}
@@ -128,6 +130,26 @@ void OBSBasic::ResetCtdDocks()
 			tabifyDockWidget(relay, hub);
 		}
 		hub->setVisible(true);
+	}
+
+	/* CTD Producer (viewers per platform, merged chat): a tab beside CTD Relay, which stays the one in front */
+	if (QDockWidget *producer = FindExtraDock(kCtdProducerDock)) {
+		producer->setFloating(false);
+		addDockWidget(Qt::RightDockWidgetArea, producer);
+		if (relay) {
+			tabifyDockWidget(relay, producer);
+		}
+		producer->setVisible(true);
+	}
+
+	/* CTD Overlays (CTD Overlay's overlays, updates, the template kit): a tab beside CTD Relay too */
+	if (QDockWidget *overlays = FindExtraDock(kCtdOverlaysDock)) {
+		overlays->setFloating(false);
+		addDockWidget(Qt::RightDockWidgetArea, overlays);
+		if (relay) {
+			tabifyDockWidget(relay, overlays);
+		}
+		overlays->setVisible(true);
 	}
 
 	if (relay) {

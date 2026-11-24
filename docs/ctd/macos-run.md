@@ -134,5 +134,5 @@ Not in, or untested:
 |---|---|
 | Settings, scenes, profiles | `~/Library/Application Support/ctd-obs/` (`basic/scenes`, `basic/profiles`) |
 | Logs | **Help → Log Files → Show Log Files**, or `~/Library/Application Support/ctd-obs/logs/` |
-| Third-party plugins (if ever) | `~/Library/Application Support/ctd-obs/plugins/` (OBS Studio's plugins are not loaded) |
+| Third-party plugins | `~/Library/Application Support/ctd-obs/plugins/` (OBS Studio's plugins are not loaded; NDI and copying a plugin from OBS Studio: [plugins.md](./plugins.md)) |
 | Remove completely | Delete `/Applications/CTD OBS.app` and `~/Library/Application Support/ctd-obs/` |
