@@ -36,11 +36,10 @@ enum class CtdWatchdogWarning { None, Growth, Limit };
 struct CtdWatchdogNdiStatus {
 	std::string mode = "off";
 	bool paused = false;
-	int receivers = 0;
-	int sends = 0;
+	int senders = 0; /* running NDI senders: program, vertical and per source */
 	uint64_t droppedFrames = 0;
 
-	bool Active() const { return mode != "off" && !paused && (receivers > 0 || sends > 0); }
+	bool Active() const { return mode != "off" && !paused && senders > 0; }
 };
 
 constexpr uint64_t kCtdMiB = 1024ull * 1024ull;
@@ -78,6 +77,6 @@ private:
 	std::optional<double> lastLog;
 };
 
-/* "[ctd-watchdog] footprint 1834 MB (+12 MB/min over 3 min), NDI receive_send: 2 receivers, 1 send, 0 dropped" */
+/* "[ctd-watchdog] footprint 1834 MB (+12 MB/min over 3 min), NDI send: 4 senders, 0 dropped" */
 std::string CtdWatchdogLogLine(uint64_t bytes, double growthMbPerMin, int windowMinutes,
 			       const CtdWatchdogNdiStatus &ndi);

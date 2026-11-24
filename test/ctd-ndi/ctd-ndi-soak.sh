@@ -1,15 +1,15 @@
 #!/bin/bash
 # CTD OBS: NDI soak test for a real Mac (docs/ctd/ndi.md, "Soak test").
 #
-# CTD OBS must already be running with Receive + Send, 2 NDI® Sources showing video in the program scene and the
-# program send on (2 receivers, 1 send). This script then watches it for 60 minutes:
+# CTD OBS must already be running with NDI on (Send), the program sender on and 3 sources with the NDI® Output filter
+# on air (4 senders). This script then watches it for 60 minutes:
 #
 #   every 60 s   the footprint CTD OBS's memory watchdog logs (phys_footprint, from inside the process: includes
-#                IOSurfaces and graphics memory), ps RSS as a cross-check, and the NDI counts, into a CSV
-#   PASS         highest footprint - first footprint < 300 MB, and 2 receivers + 1 send in every minute
+#                IOSurfaces and graphics memory), ps RSS as a cross-check, and the NDI sender count, into a CSV
+#   PASS         highest footprint - first footprint < 300 MB, and 4 senders running in every minute
 #   FAIL         anything else, including CTD OBS quitting or the watchdog line going stale
 #
-# Usage: test/ctd-ndi/ctd-ndi-soak.sh [--minutes 60] [--limit-mb 300] [--receivers 2] [--sends 1]
+# Usage: test/ctd-ndi/ctd-ndi-soak.sh [--minutes 60] [--limit-mb 300] [--senders 4]
 #                                     [--pid PID] [--log FILE] [--csv FILE]
 # Exit status: 0 PASS, 1 FAIL, 2 could not start.
 #
@@ -19,8 +19,7 @@ set -u
 
 minutes=60
 limit_mb=300
-want_receivers=2
-want_sends=1
+want_senders=4
 pid=''
 log=''
 csv=''
@@ -31,8 +30,7 @@ while [ $# -gt 0 ]; do
 	case "$1" in
 	--minutes) minutes="$2"; shift 2 ;;
 	--limit-mb) limit_mb="$2"; shift 2 ;;
-	--receivers) want_receivers="$2"; shift 2 ;;
-	--sends) want_sends="$2"; shift 2 ;;
+	--senders) want_senders="$2"; shift 2 ;;
 	--pid) pid="$2"; shift 2 ;;
 	--log) log="$2"; shift 2 ;;
 	--csv) csv="$2"; shift 2 ;;
@@ -113,15 +111,14 @@ parse() {
 	line="$1"
 	fp_mb="$(field "$line" 'footprint ([0-9]+) MB')"
 	if printf '%s' "$line" | grep -q 'NDI off'; then
-		receivers=0; sends=0; dropped=0
+		senders=0; dropped=0
 	else
-		receivers="$(field "$line" ' ([0-9]+) receivers?,')"
-		sends="$(field "$line" ' ([0-9]+) sends?,')"
+		senders="$(field "$line" ' ([0-9]+) senders?,')"
 		dropped="$(field "$line" ' ([0-9]+) dropped')"
 	fi
 	paused=0
 	printf '%s' "$line" | grep -q '(paused)' && paused=1
-	: "${fp_mb:=}" "${receivers:=}" "${sends:=}" "${dropped:=0}"
+	: "${fp_mb:=}" "${senders:=}" "${dropped:=0}"
 }
 
 rss_mb() {
@@ -136,16 +133,16 @@ if command -v caffeinate > /dev/null 2>&1; then
 	say "caffeinate: the Mac won't sleep while this runs"
 fi
 
-say "Waiting for the watchdog to report ${want_receivers} receivers and ${want_sends} send (up to ${wait_ready} s)…"
+say "Waiting for the watchdog to report ${want_senders} NDI senders (up to ${wait_ready} s)…"
 waited=0
 while :; do
 	kill -0 "$pid" 2>/dev/null || die "CTD OBS quit while waiting"
 	parse "$(last_watchdog)"
-	if [ "$receivers" = "$want_receivers" ] && [ "$sends" = "$want_sends" ] && [ "$paused" = 0 ]; then
+	if [ "$senders" = "$want_senders" ] && [ "$paused" = 0 ]; then
 		break
 	fi
 	if [ "$waited" -ge "$wait_ready" ]; then
-		die "the watchdog shows receivers=${receivers:-?} sends=${sends:-?} paused=${paused}; set up 2 NDI Sources (showing video) and the program send, see docs/ctd/ndi.md"
+		die "the watchdog shows senders=${senders:-?} paused=${paused}; turn on the program sender and put 3 sources with the NDI Output filter on air, see docs/ctd/ndi.md"
 	fi
 	sleep 5
 	waited=$((waited + 5))
@@ -154,7 +151,7 @@ say "Ready. Soak test: ${minutes} min, pass if growth < ${limit_mb} MB."
 
 # ------------------------------------------------------------------------------------------------ the soak
 
-echo 'minute,time,footprint_mb,rss_mb,receivers,sends,dropped,growth_mb' > "$csv"
+echo 'minute,time,footprint_mb,rss_mb,senders,dropped,growth_mb' > "$csv"
 
 base=''
 max=0
@@ -196,13 +193,13 @@ while [ "$minute" -le "$minutes" ]; do
 	last=$fp_mb
 	growth=$((fp_mb - base))
 
-	if [ "$receivers" != "$want_receivers" ] || [ "$sends" != "$want_sends" ] || [ "$paused" != 0 ]; then
+	if [ "$senders" != "$want_senders" ] || [ "$paused" != 0 ]; then
 		bad_counts=$((bad_counts + 1))
-		say "minute ${minute}: receivers=${receivers} sends=${sends} paused=${paused} (want ${want_receivers}/${want_sends})"
+		say "minute ${minute}: senders=${senders} paused=${paused} (want ${want_senders})"
 	fi
 
-	echo "${minute},$(date '+%Y-%m-%dT%H:%M:%S'),${fp_mb},${rss},${receivers},${sends},${dropped},${growth}" >> "$csv"
-	say "minute ${minute}/${minutes}: footprint ${fp_mb} MB (${growth} MB since start, peak +$((max - base))), RSS ${rss:-?} MB, NDI ${receivers} receivers ${sends} send, ${dropped} dropped"
+	echo "${minute},$(date '+%Y-%m-%dT%H:%M:%S'),${fp_mb},${rss},${senders},${dropped},${growth}" >> "$csv"
+	say "minute ${minute}/${minutes}: footprint ${fp_mb} MB (${growth} MB since start, peak +$((max - base))), RSS ${rss:-?} MB, ${senders} NDI senders, ${dropped} dropped"
 
 	if [ $((max - base)) -ge "$limit_mb" ]; then
 		result=FAIL
@@ -217,7 +214,7 @@ done
 
 if [ "$bad_counts" -gt 0 ]; then
 	result=FAIL
-	reasons="${reasons}NDI counts were wrong in ${bad_counts} minute(s). "
+	reasons="${reasons}The NDI sender count was wrong in ${bad_counts} minute(s). "
 fi
 if [ "$stale_max" -ge 3 ]; then
 	result=FAIL
@@ -231,7 +228,7 @@ fi
 echo
 say "==== CTD OBS NDI soak test: ${result} ===="
 say "start ${base:-?} MB, peak ${max} MB (+$(( ${max:-0} - ${base:-0} )) MB), end ${last} MB, limit +${limit_mb} MB"
-say "minutes ${minute}/${minutes}, receivers ${want_receivers}, sends ${want_sends}"
+say "minutes ${minute}/${minutes}, NDI senders ${want_senders}"
 [ -n "$reasons" ] && say "why: ${reasons}"
 say "CSV: ${csv}"
 say "log: ${log}"

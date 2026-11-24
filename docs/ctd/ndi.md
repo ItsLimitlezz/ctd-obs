@@ -2,8 +2,15 @@
 
 NDI® is a registered trademark of Vizrt NDI AB. More about NDI: <https://ndi.video/>.
 
-CTD OBS receives NDI sources and sends its program (and optionally the vertical canvas) as NDI, on macOS and Windows,
-without putting anything system-wide on the machine and without being able to take a live show down with it.
+CTD OBS **sends** NDI. It doesn't receive it. You can send:
+
+- the program ("CTD OBS Program")
+- the vertical canvas ("CTD OBS Vertical")
+- any source, scene or group, each as its own NDI sender (the **NDI® Output** filter)
+
+It works on macOS and Windows, without putting anything system-wide on the machine and without being able to take a
+live show down with it. Juan, 2026-11-23: "our only role in this software is adding support to export NDI; we should be
+able to select individual sources and send it out."
 
 **Why this design:** on 2026-11-22 Juan's NDI install (NDI Tools + Runtime + DistroAV, which also installed
 CoreMediaIO DAL camera plugins and the `NDIAudio.driver` / `NDIAudioOut.driver` CoreAudio HAL drivers) made CTD OBS on
@@ -13,18 +20,22 @@ rule below exists so that can't happen again.
 ## Rules
 
 1. **No system pieces.** No DAL/CMIO camera plugins, no HAL audio drivers, no NDI Tools, no virtual camera or audio
-   device, no DirectShow filters registered by CTD OBS. Only the NDI library, loaded into CTD OBS's own process, for
-   receive and send.
+   device, no DirectShow filters registered by CTD OBS. Only the NDI library, loaded into CTD OBS's own process, to
+   send.
 2. **One exact, verified NDI library.** CTD OBS loads only its own copy of an NDI library whose SHA-256 is on the
    allow-list compiled into the build (`plugins/ctd-ndi/src/ndi-allowlist.cpp`). It never `dlopen`s / `LoadLibrary`s a
    file in `/usr/local/lib`, `/Library/NDI…`, Program Files, `PATH` or `NDI_RUNTIME_DIR_V6`, so another NDI install
    (or an update of it) can't change what runs inside CTD OBS. See [Where the library comes from](#where-the-library-comes-from).
-3. **Off by default, a kill switch, a safe launch.** Settings ▸ CTD ▸ NDI: **Off** (default) / **Receive only** /
-   **Receive + Send**. While Off, the NDI library isn't loaded at all. `--ctd-no-ndi` (and OBS's own `--safe-mode`)
-   start CTD OBS with NDI off for that launch, whatever the setting; **CTD ▸ NDI ▸ Start without NDI…** restarts that
-   way.
-4. **Guardrails:** at most 8 NDI receivers at once, no frame queue that can grow, a memory watchdog, every NDI error
-   caught and logged, a failed source shows a placeholder instead of crashing.
+3. **Off by default, a kill switch, a safe launch.**
+   - Settings ▸ CTD ▸ NDI: **Off** (default) / **Send**. While Off, the NDI library isn't loaded at all.
+   - `--ctd-no-ndi` (and OBS's own `--safe-mode`) start CTD OBS with NDI off for that launch, whatever the setting.
+   - **CTD ▸ NDI ▸ Start without NDI…** restarts that way, and **CTD ▸ NDI ▸ Pause NDI** stops every sender at once.
+4. **Guardrails:**
+   - at most 8 NDI senders at once, all kinds together
+   - no frame queue that can grow
+   - a sender works only while its source is on air, and nothing is rendered for a sender that isn't running
+   - a memory watchdog
+   - every NDI error is caught and logged, and a sender that fails just stops, with the reason shown
 
 ## Licence finding
 
@@ -166,107 +177,133 @@ most of it.
 | Rule | DistroAV 6.2.2 |
 |---|---|
 | Never load a system NDI | `load_ndilib()` searches `NDI_RUNTIME_DIR_V6`, `/usr/lib`, `/usr/lib64`, `/usr/local/lib`; Windows only the env var; no allow-list |
-| No hooks into the window / preview | `preview-output.cpp` uses `obs_add_main_render_callback` with `gs_stage_texture` + `gs_stagesurface_map` in the same frame (a GPU stall on every frame); `main-output.cpp` and its Tools menu dialog are tied to the main window |
+| No hooks into the window / preview | `preview-output.cpp` uses `obs_add_main_render_callback` with `gs_stage_texture` + `gs_stagesurface_map` in the same frame (a GPU stall on every frame); its per-source "NDI filter" stages and maps in the same frame too; `main-output.cpp` and its Tools menu dialog are tied to the main window |
 | No install prompts / network | ERR dialogs at startup; buttons that run `winget install NDI.NDIRuntime` / `brew reinstall libndi` in a shell; an update check POSTing the OBS install GUID and the plugin's hash to distroav.org |
 | libndi not loaded until enabled | Loaded unconditionally in `obs_module_load` |
-| Bounded queues, cap on receivers | No receiver cap. libobs's buffered async cache holds up to 30 frames per source (about 1 GB of 4K BGRA); the sender passes OBS's frame to `send_send_video_async_v2` without a copy (buffer lifetime race) |
+| Bounded queues, cap on senders | No cap; the sender passes OBS's frame to `send_send_video_async_v2` without a copy (buffer lifetime race) |
 | Built in-tree against our 33.0.1 headers | An obs-plugintemplate project (`buildspec.json` obs-studio 31.1.1, its own `project()`, `find_package(libobs)`); no in-tree build; needs Qt Network and libcurl |
 
 Patching it meant a CTD fork of DistroAV changed in almost every file (the loader, plugin-main, config, both outputs,
-forms, update, the source, CMake), kept in sync with upstream by hand. A small module of our own is less code to
-review than that patch set, and it's easier to keep to these rules. DistroAV is not used, so it isn't in the About
-credits. Its code was read for reference only; nothing is copied from it.
+the filter, forms, update, CMake), kept in sync with upstream by hand. A small send-only module of our own is less
+code to review than that patch set, and it's easier to keep to these rules.
+
+- DistroAV is **not** the supported route, and isn't in the About credits. `docs/ctd/plugins.md` says the same.
+- Its code was read for reference only; nothing is copied from it.
 
 **`ctd-ndi`** is a core module: GPL-2.0-or-later, Windows and macOS, built in-tree in this repository's CI against
 OBS 33.0.1 and signed with the app like the other modules. It needs no Qt, curl or frontend window code. Its parts:
 
 | Part | What it does |
 |---|---|
-| `ndi-plugin.cpp` | Module load: registers the source and the output; reads the mode; loads NDI only when enabled; procs for the frontend; stops/starts the sends around profile and scene collection changes and on exit |
+| `ndi-plugin.cpp` | Module load: mode, the program and vertical senders, procs for the app; loads NDI only when enabled; stops every sender around profile and scene collection changes and on exit |
 | `ndi-loader.cpp` | Set up and load, as above |
-| `ndi-source.cpp` | **NDI® Source** (`ctd_ndi_source`), receive |
-| `ndi-output.cpp` | **NDI send** (`ctd_ndi_output`): program ("CTD OBS Program") and vertical ("CTD OBS Vertical") |
-| `ndi-finder.cpp` | One background finder thread (`NDIlib_find_wait_for_sources`), started the first time a source's properties open, stopped when NDI goes off |
-| `ndi-logic.cpp/.hpp` | Mode parsing, allow-list matching, path policy, SHA-256, the bounded queue, the receiver slots: no OBS, no NDI, unit-tested |
+| `ndi-sender.cpp` | One NDI sender: the bounded video queue, the sender thread, audio, unique names |
+| `ndi-output.cpp` | The raw outputs that feed senders: `ctd_ndi_output` (program, vertical: video + audio) and `ctd_ndi_source_output` (a per-source sender's video) |
+| `ndi-filter.cpp` | **NDI® Output** (`ctd_ndi_filter`): the per-source sender |
+| `ndi-logic.cpp/.hpp` | Mode parsing, allow-list matching, path policy, SHA-256, the bounded queue, the sender slots, sender names and the run decision: no OBS, no NDI, unit-tested |
 
-Nothing in it touches the main window, the preview, a render callback, a display or a Qt widget. Its only frontend use
-is `obs_frontend_get_user_config` and frontend events.
+Nothing in it touches the main window, the preview, a main render callback, a display or a Qt widget. Its only
+frontend use is `obs_frontend_get_user_config` and frontend events.
 
-### Receive (NDI® Source)
-
-- **Properties:**
-  - NDI source: a list of the sources found, editable.
-  - Bandwidth: Highest / Lowest.
-  - Audio on/off.
-  - A status line, and the ndi.video link.
-- **Threading:** one worker thread per source.
-  - It holds a receiver slot (at most **8** receivers in CTD OBS).
-  - `NDIlib_recv_create_v3` with `color_format = UYVY_BGRA`, `allow_video_fields = false`.
-  - It calls `NDIlib_recv_capture_v3(…, 100 ms)` in a loop and hands each frame straight to libobs, then frees it with
-    `NDIlib_recv_free_*` on the same iteration. Every path frees what it captured; NDI's own queue is drained all the
-    time, also while the source is hidden.
-- **Queue bound:**
-  - The source is **unbuffered** (`obs_source_set_async_unbuffered`): libobs keeps only the newest frame, never a
-    queue. That bound is 1 frame per source; the worst case is 8 sources × one 4K BGRA frame ≈ 270 MB.
-  - CTD's code holds no frames.
-  - The log warns if NDI's own receive queue (`NDIlib_recv_get_queue`) ever holds more than 4 video frames.
-- **Placeholder** (a dark 16:9 frame) when:
-  - NDI is off or paused
-  - the 8-receiver cap is reached (it retries every 2 s)
-  - creating the receiver fails
-  - NDI reports an error
-  - the sender has gone (no connection for 3 s)
-  - a frame comes in a format the source doesn't handle
-
-  The reason goes to the log once per change and to the source's status line.
-- **Errors:** NDI is a C API; every call's result is checked. The worker body also catches any C++ exception, logs
-  it, shows the placeholder and backs off.
-- **Scene data:** the source type is registered even when NDI is off, so scenes with NDI sources load, keep their
-  settings and save unchanged. They just show the placeholder.
-
-### Send
+### Program and vertical
 
 - **The output:** `ctd_ndi_output` is an `OBS_OUTPUT_AV` raw output (no encoder, no render callback).
   - "CTD OBS Program" sends the main video and audio.
   - "CTD OBS Vertical" sends the canvas named `Vertical` (`obs_get_canvas_by_name`) with the main audio.
-- **When it runs:** only in Receive + Send mode, from when loading finishes until exit, mode change or pause. Each send
-  can be switched on or off in Settings.
+- **When it runs:** while NDI is on (and not paused), from when loading finishes until exit. Each can be ticked or
+  unticked in Settings ▸ CTD ▸ NDI's outputs list (`[CTD] NDISendProgram`, default on; `[CTD] NDISendVertical`, default
+  off).
+- **Vertical resolution:** like any active output, the vertical send holds the vertical canvas's resolution. Stop it
+  before changing the vertical size.
+
+### Per-source senders: the NDI® Output filter
+
+- **Adding one:** right-click any source, scene or group ▸ **Filters** ▸ **+** ▸ **NDI® Output**.
+  - Its settings are the **NDI sender name** (empty: the source's name) and **Send the source's audio**.
+  - It is saved with the scene collection like any filter.
+  - Disabling the filter (the eye in Filters, or unticking it in Settings ▸ CTD ▸ NDI) stops the sender.
+- **When it runs:** only while all of these hold (`DecideSender`, unit-tested). Otherwise its canvas, output and NDI
+  sender don't exist, and **nothing is rendered for it**.
+  1. NDI is on and not paused, and no profile / collection switch is under way
+  2. the filter is enabled
+  3. its source is **active**: on air in the program, or inside a scene or group that is (OBS's own `obs_source_active`)
+  4. the source has a picture (or has no video at all: then it's an audio-only sender)
+  5. the name is usable and no other running sender has it
+  6. one of the 8 sender slots is free
+
+  The first reason it doesn't run shows as its state, in the filter's properties and in the outputs list: "Waiting:
+  the source isn't on air", "NDI sender limit reached", and so on.
 - **Video:**
-  - `raw_video` runs on OBS's video thread. It copies the frame into one of **3 preallocated buffers** and pushes it
-    into a **bounded queue of 2**: when the queue is full, the oldest frame is dropped and its buffer reused.
-  - A sender thread pops frames and calls `NDIlib_send_send_video_v2` (synchronous, so NDI never reads a buffer OBS
-    or we reuse).
-  - Memory is fixed at 3 frames per send, whatever NDI or the network does. Dropped frames are counted and logged
-    every 60 s.
+  - It uses a **private canvas** (`obs_canvas_create_private`, `EPHEMERAL`, no `ACTIVATE`: it never makes the source
+    active itself, so "on air" stays the program's call), the size of the source, with the source on channel 0.
+  - A `ctd_ndi_source_output` on that canvas's video gets OBS's own render, GPU colour conversion and asynchronous
+    readback. That is the path the vertical canvas uses, not a hand-written texture readback, so there's no GPU stall.
+  - The frames go into the sender's bounded queue.
+  - A source bigger than 4096 px is scaled down to fit, keeping its aspect.
+  - A size change restarts the sender at the new size.
+- **Audio:** `filter_audio` sends the source's own audio as it passes through, unchanged. Scenes and groups have no
+  audio of their own in OBS, so their senders are video only.
+- **Threading:**
+  - `video_tick` (graphics thread) only notices that something may have changed (a signature of the inputs) and queues
+    the decision on the UI thread.
+  - Canvases and outputs are created and destroyed only on the UI thread. A filter freed on another thread hands its
+    canvas and output to the UI thread to free.
+  - When a sender stops, the others re-check (a slot or a name may be free).
+
+### Every sender
+
+- **Video** (`ndi-sender.cpp`):
+  - The raw output's callback (OBS's video thread) copies the frame into one of **3 preallocated buffers** and pushes
+    it into a **bounded queue of 2**. When the queue is full, the oldest frame is dropped and its buffer reused.
+  - A sender thread calls `NDIlib_send_send_video_v2`, which is synchronous, so NDI never reads a buffer that is
+    reused.
+  - Memory is fixed at 3 frames per sender, whatever NDI or the network does. Dropped frames are counted and logged.
   - NV12, I420, UYVY, BGRA, BGRX and RGBA go as they are. Other formats are converted to NV12 by OBS
     (`obs_output_set_video_conversion`).
   - The frame rate is the exact `fps_num/fps_den`.
-- **Audio:** planar float, copied into one reusable buffer and sent with `NDIlib_send_send_audio_v3`.
-- **Switches and updates:** the sends stop on `PROFILE_CHANGING` / `SCENE_COLLECTION_CHANGING` and start again after
-  the change.
-  - `OBSBasic::CtdAnyOutputActive` doesn't count `ctd_ndi_output`, so NDI never blocks a profile/collection switch or
-    an update install.
-  - Like any active output, it does hold the vertical canvas's resolution: stop the vertical send before changing the
-    vertical size.
+- **Audio:** planar float, copied into one reusable buffer, sent with `NDIlib_send_send_audio_v3`.
+- **Names:** the cleaned name (trimmed, no control characters, at most 63 bytes, never splitting a UTF-8 character)
+  must be unique among running senders. A second sender with a taken name waits, with the state "Another sender
+  already uses this name".
+- **Cap:** at most **8** senders at once (program, vertical and per-source together). The 9th waits, with the state
+  "NDI sender limit reached", and starts when a slot frees.
+- **Switches and updates:**
+  - Every sender stops on `PROFILE_CHANGING` / `SCENE_COLLECTION_CHANGING` and starts again after the change. A new
+    collection brings its own NDI Output filters.
+  - `OBSBasic::CtdAnyOutputActive` doesn't count `ctd_ndi_output` / `ctd_ndi_source_output`, so NDI never blocks a
+    profile / collection switch or an update install.
 
 ### Mode and kill switch
 
-| Mode (`[CTD] NDIMode` in user.ini) | NDI library | Receivers | Sends |
-|---|---|---|---|
-| `off` (default; also anything unknown) | not loaded | placeholder | none |
-| `receive` | loaded | yes | none |
-| `receive_send` | loaded | yes | program (`[CTD] NDISendProgram`, default on), vertical (`[CTD] NDISendVertical`, default off) |
+| Mode (`[CTD] NDIMode` in user.ini) | NDI library | Senders |
+|---|---|---|
+| `off` (default; also anything unknown, and an old test build's `receive` / `receive_send`) | not loaded | none |
+| `send` | loaded | program, vertical (as ticked), every enabled NDI Output filter whose source is on air |
 
 - **Changing the mode** (Settings ▸ CTD ▸ NDI, OK/Apply) takes effect at once:
-  - Going **to Off** stops every receiver thread (receivers destroyed), the finder and the sends, within about 100 ms.
+  - Going **to Off** stops every sender.
   - The library stays mapped until CTD OBS quits, because unloading it while NDI's own threads wind down isn't safe.
     Settings says "NDI is off. The library stays in memory, unused, until CTD OBS restarts."
   - Going **on** loads it if it isn't loaded yet.
 - **Launching without NDI:** `--ctd-no-ndi` or OBS's `--safe-mode` starts with NDI off for that launch, whatever the
-  setting; Settings shows "Off for this launch". **CTD ▸ NDI ▸ Start without NDI…** asks, then restarts CTD OBS with
-  `--ctd-no-ndi` (it warns first when streaming or recording, since a restart ends them).
-- **CTD ▸ NDI ▸ Pause NDI** stops all receivers and sends at once, without restarting and without changing the
-  setting. **Resume NDI** starts them again.
+  setting; Settings shows "NDI is off for this launch". **CTD ▸ NDI ▸ Start without NDI…** asks, then restarts CTD OBS
+  with `--ctd-no-ndi` (it warns first when streaming or recording, since a restart ends them).
+- **CTD ▸ NDI ▸ Pause NDI** stops every sender at once, without restarting and without changing the setting. **Resume
+  NDI** starts them again.
+
+### Settings ▸ CTD ▸ NDI
+
+- **NDI:** Off / Send.
+- **NDI outputs:** one row per sender: CTD OBS Program, CTD OBS Vertical, then every NDI Output filter in the scene
+  collection (on inputs, scenes and groups). Each row shows the sender name, the source and the state.
+  - **Tick / untick** sends / stops: for program and vertical it's the setting, for a filter its enabled state.
+  - **Double-click a filter's name** to rename its sender.
+  - Changes apply on OK/Apply; **Refresh** reloads the states.
+- **The library line:**
+  - **Set up from NDI Runtime**
+  - the link to the NDI 6 Runtime (not NDI Tools)
+  - a warning when NDI Tools' system pieces are installed
+- The trademark line and the ndi.video link.
 
 ### Memory watchdog
 
@@ -278,15 +315,14 @@ with the maths in `ctd-memory-watchdog-logic.cpp` (unit-tested).
     graphics memory owned by the process.
   - Windows: private bytes (`PROCESS_MEMORY_COUNTERS_EX.PrivateUsage`) plus the process's local video memory on the
     main adapter (`IDXGIAdapter3::QueryVideoMemoryInfo(...).CurrentUsage`).
-- **Log, every 60 s:**
-  `[ctd-watchdog] footprint 1834 MB (+12 MB/min over 3 min), NDI receive_send: 2 receivers, 1 send, 0 dropped`.
+- **Log, every 60 s:** `[ctd-watchdog] footprint 1834 MB (+12 MB/min over 3 min), NDI send: 4 senders, 0 dropped`.
 - **Warning when either holds:**
   - It grew by at least **200 MB in each of the last 3 one-minute intervals** (sustained, so one spike such as a scene
     load doesn't count).
   - It passed **6144 MB** (`[CTD] WatchdogLimitMB` in user.ini).
 
-  The warning is non-blocking (a window that doesn't stop anything) and names NDI when it is active ("NDI is on: 2
-  receivers, 1 send"). When NDI is active it offers **Pause NDI**, which does what the CTD menu item does. It shows at
+  The warning is non-blocking (a window that doesn't stop anything) and names NDI when it is active ("NDI is on: 4 NDI
+  senders running"). When NDI is active it offers **Pause NDI**, which does what the CTD menu item does. It shows at
   most once every 10 minutes while the condition lasts.
 
 ## Tests and CI
@@ -298,7 +334,8 @@ with the maths in `ctd-memory-watchdog-logic.cpp` (unit-tested).
     var or search path is used
   - SHA-256 against known vectors
   - the bounded queue: never above capacity, drops the oldest, buffers returned
-  - the receiver slots (the cap of 8, released on destroy)
+  - the sender slots (the cap of 8, released on stop, never above the cap under 16 competing threads)
+  - sender names, the run decision (each condition alone stops a sender) and the canvas size
   - the watchdog maths: rate, sustained growth, limit, re-arm, the 60 s log line
   - mode parsing, and safe mode / `--ctd-no-ndi` overriding it
 - **Builds:** Windows x64 and both macOS jobs build `ctd-ndi`.
@@ -307,12 +344,13 @@ with the maths in `ctd-memory-watchdog-logic.cpp` (unit-tested).
   - The Windows job's Check NDI packaging step requires `ctd-ndi.dll` in the zip and fails on any `Processing.NDI.*`.
   - The Smoke test checks the module's `@rpath` libraries.
   - The signing script signs it with every other Mach-O.
-- **Soak test** on a real Mac: `test/ctd-ndi/ctd-ndi-soak.sh`, steps below. CI can't do it: GitHub's Macs can't start CTD OBS,
-  and there's no NDI network.
+- **Soak test** on a real Mac: `test/ctd-ndi/ctd-ndi-soak.sh`, steps below. CI can't do it: GitHub's Macs can't start
+  CTD OBS, and there's no NDI network.
 
 ## Soak test (Mac, before merge)
 
-What it proves: 60 minutes with 2 NDI receivers and 1 NDI send, total memory growth under 300 MB.
+What it proves: 60 minutes with 3 per-source NDI senders plus the program sender (4 senders), total memory growth
+under 300 MB, the footprint logged every minute.
 
 **Setup, once:**
 
@@ -320,35 +358,38 @@ What it proves: 60 minutes with 2 NDI receivers and 1 NDI send, total memory gro
    checks for DAL/HAL NDI pieces and refuses to run if it finds any.
 2. Install the CTD OBS build under test, open it.
 3. In Settings ▸ CTD ▸ NDI:
-   - choose **Receive + Send**
-   - keep **Send the program** on and **Send the vertical canvas** off (the test counts exactly 1 send)
+   - choose **Send**
+   - in the outputs list, tick **CTD OBS Program** and untick **CTD OBS Vertical**
    - press **Set up from NDI Runtime** if the library line doesn't say "NDI library: 6.4.0.2, CTD OBS's own verified
      copy"
    - OK
 
 **Scene:**
 
-1. Make a scene with **two NDI® Sources**:
-   - Source 1: **another machine's** NDI source (e.g. the show PC's CTD OBS "CTD OBS Program", or any NDI camera).
-   - Source 2: this Mac's own "CTD OBS Program" (a loopback, so it also exercises the send).
-2. Make it the program scene. Both must show video.
+1. In the program scene, have three sources that show a moving picture: e.g. a video capture device or a looping media
+   file, a browser source with an animation, and a nested scene.
+2. Add the **NDI® Output** filter to each of the three: right-click ▸ Filters ▸ + ▸ NDI® Output. Give them different
+   names, e.g. "Soak 1", "Soak 2", "Soak 3".
+3. Settings ▸ CTD ▸ NDI's outputs list shows four rows **Sending**.
+4. Optional, to watch the senders: NDI Studio Monitor on **another** machine. Never install NDI Tools on this Mac.
 
 **Run:**
 
 1. In Terminal, from a checkout of this branch: `test/ctd-ndi/ctd-ndi-soak.sh`. (Or copy the one file anywhere and
    run it with `bash`.) It needs no sudo.
-2. Leave the Mac alone for 60 minutes: no sleep (the script runs `caffeinate`), CTD OBS in front or not.
+2. Leave the Mac alone for 60 minutes: no sleep (the script runs `caffeinate`), CTD OBS in front or not. Don't change
+   the program scene: the per-source senders send only while their sources are on air.
 
 **What the script does:**
 
-- It finds CTD OBS's process and its current log, and waits for the watchdog line showing **2 receivers, 1 send**.
+- It finds CTD OBS's process and its current log, and waits for the watchdog line showing **4 senders**.
 - Then it records, every 60 s for 60 minutes:
   - the watchdog's footprint (from inside CTD OBS: `phys_footprint`)
   - `ps` RSS as a cross-check
-  - the NDI counts
+  - the NDI sender count and dropped frames
 
   These go to `~/Desktop/ctd-ndi-soak-<date>.csv`.
-- **PASS:** the highest footprint minus the first is under **300 MB**, and every minute had 2 receivers and 1 send.
+- **PASS:** the highest footprint minus the first is under **300 MB**, and every minute had 4 senders running.
 - **FAIL:** anything else, including CTD OBS quitting. It prints the CSV path and a summary.
 
 Send Juan's result (the summary lines and the CSV) to the SR with the PR. The SR merges only after a PASS.

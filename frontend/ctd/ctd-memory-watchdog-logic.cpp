@@ -156,9 +156,9 @@ std::string CtdWatchdogLogLine(uint64_t bytes, double growthMbPerMin, int window
 	if (ndi.mode == "off") {
 		snprintf(ndiText, sizeof(ndiText), "NDI off");
 	} else {
-		snprintf(ndiText, sizeof(ndiText), "NDI %s%s: %d receiver%s, %d send%s, %llu dropped", ndi.mode.c_str(),
-			 ndi.paused ? " (paused)" : "", ndi.receivers, ndi.receivers == 1 ? "" : "s", ndi.sends,
-			 ndi.sends == 1 ? "" : "s", static_cast<unsigned long long>(ndi.droppedFrames));
+		snprintf(ndiText, sizeof(ndiText), "NDI %s%s: %d sender%s, %llu dropped", ndi.mode.c_str(),
+			 ndi.paused ? " (paused)" : "", ndi.senders, ndi.senders == 1 ? "" : "s",
+			 static_cast<unsigned long long>(ndi.droppedFrames));
 	}
 
 	char line[320];

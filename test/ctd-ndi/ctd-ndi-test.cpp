@@ -1,4 +1,4 @@
-/* CTD OBS: unit tests for the NDI module's logic (plugins/ctd-ndi/src/ndi-logic.cpp, ndi-allowlist.cpp) and the
+/* CTD OBS: unit tests for the NDI send module's logic (plugins/ctd-ndi/src/ndi-logic.cpp, ndi-allowlist.cpp) and the
  * memory watchdog (frontend/ctd/ctd-memory-watchdog-logic.cpp). docs/ctd/ndi.md */
 
 #include "ndi-logic.hpp"
@@ -34,21 +34,21 @@ static void TestMode()
 	CHECK(ParseMode(nullptr) == Mode::Off);
 	CHECK(ParseMode("") == Mode::Off);
 	CHECK(ParseMode("off") == Mode::Off);
-	CHECK(ParseMode("receive") == Mode::Receive);
-	CHECK(ParseMode("receive_send") == Mode::ReceiveSend);
-	CHECK(ParseMode("Receive") == Mode::Off); /* exact only: anything unknown is Off */
-	CHECK(ParseMode("send") == Mode::Off);
-	CHECK(ParseMode("receive ") == Mode::Off);
-	CHECK(std::strcmp(ModeName(Mode::ReceiveSend), "receive_send") == 0);
-	CHECK(ParseMode(ModeName(Mode::Receive)) == Mode::Receive);
+	CHECK(ParseMode("send") == Mode::Send);
+	CHECK(ParseMode("Send") == Mode::Off); /* exact only: anything unknown is Off */
+	CHECK(ParseMode("send ") == Mode::Off);
+	CHECK(ParseMode("receive") == Mode::Off);      /* receive is gone */
+	CHECK(ParseMode("receive_send") == Mode::Off); /* an old #52 test build's value: Off, not Send */
+	CHECK(std::strcmp(ModeName(Mode::Send), "send") == 0);
+	CHECK(ParseMode(ModeName(Mode::Send)) == Mode::Send);
+	CHECK(ParseMode(ModeName(Mode::Off)) == Mode::Off);
 
-	CHECK(EffectiveMode(Mode::ReceiveSend, false, false) == Mode::ReceiveSend);
-	CHECK(EffectiveMode(Mode::ReceiveSend, true, false) == Mode::Off); /* --ctd-no-ndi */
-	CHECK(EffectiveMode(Mode::Receive, false, true) == Mode::Off);     /* --safe-mode */
+	CHECK(EffectiveMode(Mode::Send, false, false) == Mode::Send);
+	CHECK(EffectiveMode(Mode::Send, true, false) == Mode::Off); /* --ctd-no-ndi */
+	CHECK(EffectiveMode(Mode::Send, false, true) == Mode::Off); /* --safe-mode */
 	CHECK(EffectiveMode(Mode::Off, false, false) == Mode::Off);
 
-	CHECK(!ModeReceives(Mode::Off) && ModeReceives(Mode::Receive) && ModeReceives(Mode::ReceiveSend));
-	CHECK(!ModeSends(Mode::Off) && !ModeSends(Mode::Receive) && ModeSends(Mode::ReceiveSend));
+	CHECK(!ModeSends(Mode::Off) && ModeSends(Mode::Send));
 }
 
 /* ------------------------------------------------------------- allow-list */
@@ -378,11 +378,11 @@ static void TestBoundedQueue()
 	CHECK(std::chrono::steady_clock::now() - start < std::chrono::seconds(5));
 }
 
-/* --------------------------------------------------------- receiver slots */
+/* ----------------------------------------------------------- sender slots */
 
-static void TestReceiverSlots()
+static void TestSenderSlots()
 {
-	ReceiverSlots slots(kMaxReceivers);
+	SenderSlots slots(kMaxSenders);
 	CHECK(slots.Max() == 8);
 	std::vector<SlotGuard> held;
 	for (int i = 0; i < 8; i++) {
@@ -392,7 +392,7 @@ static void TestReceiverSlots()
 	SlotGuard ninth(&slots);
 	CHECK(!ninth.Held()); /* the cap */
 	CHECK(slots.InUse() == 8);
-	held.pop_back(); /* a source destroyed */
+	held.pop_back(); /* a sender stopped */
 	CHECK(slots.InUse() == 7);
 	SlotGuard again(&slots);
 	CHECK(again.Held());
@@ -407,7 +407,7 @@ static void TestReceiverSlots()
 	CHECK(slots.InUse() == 0);
 
 	/* many threads competing: never above the cap */
-	ReceiverSlots shared(8);
+	SenderSlots shared(8);
 	std::atomic<int> peak{0};
 	std::vector<std::thread> threads;
 	for (int t = 0; t < 16; t++) {
@@ -428,6 +428,87 @@ static void TestReceiverSlots()
 	}
 	CHECK(peak.load() <= 8);
 	CHECK(shared.InUse() == 0);
+}
+
+/* ----------------------------------------------------------- sender rules */
+
+static void TestSenderRules()
+{
+	CHECK(CleanSenderName("CTD OBS Program") == "CTD OBS Program");
+	CHECK(CleanSenderName("  Camera 1  ") == "Camera 1");
+	CHECK(CleanSenderName("Cam\n1\t") == "Cam1");
+	CHECK(CleanSenderName("   ").empty());
+	CHECK(CleanSenderName("").empty());
+	CHECK(CleanSenderName(std::string(100, 'a')).size() == kMaxSenderNameBytes);
+	/* never cuts a UTF-8 character in half: 62 ASCII + "é" (2 bytes) is 64 bytes -> the é goes */
+	const std::string accent = std::string(62, 'a') + "\xc3\xa9";
+	CHECK(CleanSenderName(accent) == std::string(62, 'a'));
+	CHECK(CleanSenderName("Sc\xc3\xa8ne") == "Sc\xc3\xa8ne");
+
+	SenderInputs in;
+	in.ndiOn = true;
+	in.filterEnabled = true;
+	in.sourceActive = true;
+	in.width = 1920;
+	in.height = 1080;
+	in.nameUsable = true;
+	in.slotFree = true;
+	CHECK(DecideSender(in) == SenderState::Run);
+
+	/* each condition alone stops it, and the first reason wins */
+	SenderInputs t = in;
+	t.ndiOn = false;
+	CHECK(DecideSender(t) == SenderState::Off);
+	t = in;
+	t.paused = true;
+	CHECK(DecideSender(t) == SenderState::Paused);
+	t = in;
+	t.filterEnabled = false;
+	CHECK(DecideSender(t) == SenderState::Disabled);
+	t = in;
+	t.sourceActive = false; /* not on air: nothing is rendered or sent */
+	CHECK(DecideSender(t) == SenderState::Inactive);
+	t = in;
+	t.width = 0;
+	CHECK(DecideSender(t) == SenderState::NoSize);
+	t.audioOnly = true; /* a microphone: no picture needed */
+	CHECK(DecideSender(t) == SenderState::Run);
+	t = in;
+	t.nameUsable = false;
+	CHECK(DecideSender(t) == SenderState::BadName);
+	t = in;
+	t.nameTaken = true;
+	CHECK(DecideSender(t) == SenderState::NameTaken);
+	t = in;
+	t.slotFree = false;
+	CHECK(DecideSender(t) == SenderState::Limit);
+	t = in;
+	t.ndiOn = false;
+	t.slotFree = false;
+	t.sourceActive = false;
+	CHECK(DecideSender(t) == SenderState::Off);
+	CHECK(std::strcmp(SenderStateText(SenderState::Run), "Sending") == 0);
+	CHECK(std::strlen(SenderStateText(SenderState::Limit)) > 0);
+
+	uint32_t w = 1, h = 1;
+	SenderCanvasSize(1920, 1080, w, h);
+	CHECK(w == 1920 && h == 1080);
+	SenderCanvasSize(1281, 721, w, h);
+	CHECK(w == 1280 && h == 720); /* even */
+	SenderCanvasSize(1, 1, w, h);
+	CHECK(w == 2 && h == 2);
+	SenderCanvasSize(0, 1080, w, h);
+	CHECK(w == 0 && h == 0);
+	SenderCanvasSize(8192, 4096, w, h);
+	CHECK(w == 4096 && h == 2048); /* shrunk, aspect kept */
+	SenderCanvasSize(1000, 20000, w, h);
+	CHECK(h == 4096 && w == 204);
+	for (uint32_t a = 1; a < 9000; a += 397) {
+		for (uint32_t b = 1; b < 9000; b += 613) {
+			SenderCanvasSize(a, b, w, h);
+			CHECK(w >= 2 && h >= 2 && w <= 4096 && h <= 4096 && w % 2 == 0 && h % 2 == 0);
+		}
+	}
 }
 
 /* -------------------------------------------------------------- watchdog */
@@ -554,16 +635,22 @@ static void TestWatchdog()
 
 	/* the line itself (the soak script parses it) */
 	CtdWatchdogNdiStatus ndi;
-	ndi.mode = "receive_send";
-	ndi.receivers = 2;
-	ndi.sends = 1;
+	ndi.mode = "send";
+	ndi.senders = 4;
 	CHECK(CtdWatchdogLogLine(1834 * MB, 12.4, 3, ndi) ==
-	      "[ctd-watchdog] footprint 1834 MB (+12 MB/min over 3 min), NDI receive_send: 2 receivers, 1 send, 0 dropped");
+	      "[ctd-watchdog] footprint 1834 MB (+12 MB/min over 3 min), NDI send: 4 senders, 0 dropped");
 	CHECK(ndi.Active());
+	ndi.senders = 1;
+	ndi.droppedFrames = 7;
+	CHECK(CtdWatchdogLogLine(1834 * MB, 0, 3, ndi) ==
+	      "[ctd-watchdog] footprint 1834 MB (+0 MB/min over 3 min), NDI send: 1 sender, 7 dropped");
 	ndi.paused = true;
 	CHECK(!ndi.Active());
 	CHECK(CtdWatchdogLogLine(1834 * MB, -3, 3, ndi) ==
-	      "[ctd-watchdog] footprint 1834 MB (-3 MB/min over 3 min), NDI receive_send (paused): 2 receivers, 1 send, 0 dropped");
+	      "[ctd-watchdog] footprint 1834 MB (-3 MB/min over 3 min), NDI send (paused): 1 sender, 7 dropped");
+	CtdWatchdogNdiStatus on;
+	on.mode = "send";
+	CHECK(!on.Active()); /* on, but nothing sending */
 	CtdWatchdogNdiStatus off;
 	CHECK(!off.Active());
 	CHECK(CtdWatchdogLogLine(700 * MB, 0, 3, off) ==
@@ -578,7 +665,8 @@ int main()
 	TestLoaderPaths();
 	TestSha256();
 	TestBoundedQueue();
-	TestReceiverSlots();
+	TestSenderSlots();
+	TestSenderRules();
 	TestWatchdog();
 	std::printf("%d checks, %d failed\n", checks, failures);
 	return failures == 0 ? 0 : 1;

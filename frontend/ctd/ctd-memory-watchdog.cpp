@@ -139,8 +139,7 @@ void CtdMemoryWatchdog::Sample()
 		CtdWatchdogNdiStatus status;
 		status.mode = ndi.available ? ndi.mode : "off";
 		status.paused = ndi.paused;
-		status.receivers = ndi.receivers;
-		status.sends = ndi.sends;
+		status.senders = ndi.senders;
 		status.droppedFrames = static_cast<uint64_t>(ndi.dropped < 0 ? 0 : ndi.dropped);
 		const std::string line =
 			CtdWatchdogLogLine(bytes, logic.GrowthMbPerMin(windowMinutes * 60.0), windowMinutes, status);
@@ -156,8 +155,7 @@ void CtdMemoryWatchdog::Sample()
 void CtdMemoryWatchdog::Warn(CtdWatchdogWarning warning, uint64_t bytes, double rate)
 {
 	const CtdNdiStatus ndi = CtdNdiQueryStatus();
-	const bool ndiActive = ndi.available && ndi.mode != "off" && !ndi.paused &&
-			       (ndi.receivers > 0 || ndi.sends > 0);
+	const bool ndiActive = ndi.available && ndi.mode != "off" && !ndi.paused && ndi.senders > 0;
 	const qulonglong mb = static_cast<qulonglong>(bytes / kCtdMiB);
 
 	blog(LOG_WARNING, "[ctd-watchdog] WARNING: %s: footprint %llu MB, %+.0f MB/min%s",
@@ -169,7 +167,7 @@ void CtdMemoryWatchdog::Warn(CtdWatchdogWarning warning, uint64_t bytes, double 
 			? QTStr("CTD.Watchdog.Growth").arg(mb).arg(static_cast<long long>(std::llround(rate)))
 			: QTStr("CTD.Watchdog.Limit").arg(mb).arg(static_cast<qulonglong>(logic.Config().limitMb));
 	if (ndiActive) {
-		text += "\n\n" + QTStr("CTD.Watchdog.NdiActive").arg(ndi.receivers).arg(ndi.sends);
+		text += "\n\n" + QTStr("CTD.Watchdog.NdiActive").arg(ndi.senders);
 	}
 
 	if (box) {

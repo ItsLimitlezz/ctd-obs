@@ -58,10 +58,11 @@ CtdNdiStatus CtdNdiQueryStatus()
 		status.version = Str(&cd, "version");
 		status.installed = Str(&cd, "installed");
 		status.message = Str(&cd, "message");
-		status.receivers = static_cast<int>(calldata_int(&cd, "receivers"));
-		status.maxReceivers = static_cast<int>(calldata_int(&cd, "max_receivers"));
-		status.sends = static_cast<int>(calldata_int(&cd, "sends"));
+		status.senders = static_cast<int>(calldata_int(&cd, "senders"));
+		status.maxSenders = static_cast<int>(calldata_int(&cd, "max_senders"));
 		status.dropped = calldata_int(&cd, "dropped");
+		status.program = calldata_bool(&cd, "program");
+		status.vertical = calldata_bool(&cd, "vertical");
 		status.systemPieces = Str(&cd, "system_pieces");
 	}
 	calldata_free(&cd);

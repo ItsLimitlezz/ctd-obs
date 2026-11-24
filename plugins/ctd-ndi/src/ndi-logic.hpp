@@ -2,14 +2,15 @@
     CTD OBS NDI module: the parts with no OBS and no NDI dependency, so
     test/ctd-ndi can unit-test them (docs/ctd/ndi.md).
 
-      mode           Off / Receive / ReceiveSend, from user.ini and the launch
+      mode           Off / Send, from user.ini and the launch
       allow-list     {platform, version, SHA-256} of the NDI libraries CTD
                      OBS accepts (ndi-allowlist.cpp)
       path policy    where the loader may load from (CTD OBS's own folder or
                      the app bundle) and where it never may (system paths)
       SHA-256        to check a library before it is ever loaded
       BoundedQueue   never holds more than its capacity; drops the oldest
-      ReceiverSlots  the cap on NDI receivers
+      SenderSlots    the cap on NDI senders (program, vertical and per source)
+      sender rules   sender names, and when a per-source sender may run
 
     Copyright (C) 2026 CineTech Digital
 
@@ -38,22 +39,18 @@ namespace ctd_ndi {
  * Mode
  * ---------------------------------------------------------------------- */
 
-enum class Mode { Off, Receive, ReceiveSend };
+enum class Mode { Off, Send };
 
-/* "off", "receive", "receive_send"; anything else (missing, misspelt) is Off */
+/* "off", "send"; anything else (missing, misspelt, the old "receive") is Off */
 Mode ParseMode(const char *text);
 const char *ModeName(Mode mode);
 
 /* The mode this launch runs with: --ctd-no-ndi and OBS's safe mode turn NDI off whatever the setting */
 Mode EffectiveMode(Mode configured, bool launchDisabled, bool safeMode);
 
-inline bool ModeReceives(Mode mode)
-{
-	return mode != Mode::Off;
-}
 inline bool ModeSends(Mode mode)
 {
-	return mode == Mode::ReceiveSend;
+	return mode == Mode::Send;
 }
 
 /* -------------------------------------------------------------------------
@@ -259,14 +256,14 @@ private:
 };
 
 /* -------------------------------------------------------------------------
- * ReceiverSlots: the cap on concurrently connected NDI receivers
+ * SenderSlots: the cap on NDI senders running at once (program, vertical and per-source together)
  * ---------------------------------------------------------------------- */
 
-constexpr int kMaxReceivers = 8;
+constexpr int kMaxSenders = 8;
 
-class ReceiverSlots {
+class SenderSlots {
 public:
-	explicit ReceiverSlots(int max_) : max(max_) {}
+	explicit SenderSlots(int max_) : max(max_) {}
 	bool TryAcquire();
 	void Release();
 	int InUse() const { return inUse.load(); }
@@ -281,7 +278,7 @@ private:
 class SlotGuard {
 public:
 	SlotGuard() = default;
-	explicit SlotGuard(ReceiverSlots *slots_) : slots(slots_ && slots_->TryAcquire() ? slots_ : nullptr) {}
+	explicit SlotGuard(SenderSlots *slots_) : slots(slots_ && slots_->TryAcquire() ? slots_ : nullptr) {}
 	SlotGuard(SlotGuard &&other) noexcept : slots(other.slots) { other.slots = nullptr; }
 	SlotGuard &operator=(SlotGuard &&other) noexcept
 	{
@@ -306,7 +303,43 @@ public:
 	}
 
 private:
-	ReceiverSlots *slots = nullptr;
+	SenderSlots *slots = nullptr;
 };
+
+/* -------------------------------------------------------------------------
+ * Sender rules
+ * ---------------------------------------------------------------------- */
+
+constexpr size_t kMaxSenderNameBytes = 63;
+
+/* The NDI sender name as it will be published: trimmed, control characters dropped, at most kMaxSenderNameBytes bytes
+ * (never splitting a UTF-8 character). Empty if nothing is left. */
+std::string CleanSenderName(const std::string &name);
+
+/* What a per-source sender (the NDI Output filter) needs to run. It runs only when all hold: NDI is on and not paused,
+ * the filter is enabled, its source is active (on air: in the program, or inside something that is), the source has a
+ * size (unless it is audio only), the name is usable and not already taken by another running sender, and a slot is free. */
+struct SenderInputs {
+	bool ndiOn = false;
+	bool paused = false;
+	bool filterEnabled = false;
+	bool sourceActive = false;
+	uint32_t width = 0;
+	uint32_t height = 0;
+	bool audioOnly = false; /* a source with no video (a microphone): sends audio only, so no size is needed */
+	bool nameUsable = false;
+	bool nameTaken = false;
+	bool slotFree = false;
+};
+
+enum class SenderState { Off, Paused, Disabled, Inactive, NoSize, BadName, NameTaken, Limit, Run };
+
+/* The first reason it can't run, in the order above, or Run */
+SenderState DecideSender(const SenderInputs &in);
+const char *SenderStateText(SenderState state);
+
+/* The size a sender's canvas gets for a source of width x height: even, at least 2, at most 4096 per side, aspect kept
+ * when it has to shrink. 0 x 0 for a source with no size. */
+void SenderCanvasSize(uint32_t width, uint32_t height, uint32_t &outWidth, uint32_t &outHeight);
 
 } // namespace ctd_ndi

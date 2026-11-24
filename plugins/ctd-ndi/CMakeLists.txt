@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28...3.30)
 
-# CTD OBS: NDI receive and send in-process, no system pieces (docs/ctd/ndi.md). The NDI library is loaded at run time
+# CTD OBS: NDI send in-process (program, vertical, any source), no system pieces (docs/ctd/ndi.md). The NDI library is loaded at run time
 # (CTD OBS's own verified copy of the official NDI 6 Runtime's); nothing links against it. deps/ndi/include holds NDI's
 # MIT-licensed headers.
 
@@ -16,14 +16,15 @@ target_sources(
   ctd-ndi
   PRIVATE
     src/ndi-allowlist.cpp
-    src/ndi-finder.cpp
+    src/ndi-filter.cpp
     src/ndi-loader.cpp
     src/ndi-logic.cpp
     src/ndi-logic.hpp
     src/ndi-module.hpp
     src/ndi-output.cpp
     src/ndi-plugin.cpp
-    src/ndi-source.cpp
+    src/ndi-sender.cpp
+    src/ndi-sender.hpp
 )
 target_include_directories(ctd-ndi PRIVATE src)
 target_include_directories(ctd-ndi SYSTEM PRIVATE "${CMAKE_SOURCE_DIR}/deps/ndi/include")

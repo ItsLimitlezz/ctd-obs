@@ -33,14 +33,13 @@ const NDIlib_v6 *Lib();
 /* The mode this launch runs with right now (Off while launch-disabled) */
 Mode CurrentMode();
 bool Paused();
-/* NDI may receive: the library is loaded, the mode receives and NDI isn't paused. Sources check it every loop. */
+/* NDI may send: the library is loaded, the mode sends and NDI isn't paused */
 bool Running();
-/* NDI may send: Running() and the mode sends */
-bool SendingAllowed();
-/* Changes whenever Running() may have changed; sources reconnect when it does */
+/* Changes whenever Running() may have changed; senders re-check when it does */
 uint64_t RunGeneration();
 
-ReceiverSlots &Slots();
+/* The cap on running senders: program, vertical and per-source together */
+SenderSlots &Slots();
 
 /* ---------------------------------------------------------------- loader (ndi-loader.cpp) */
 
@@ -65,20 +64,21 @@ std::string InstalledVersion();
 /* NDI Tools pieces installed system-wide (the 2026-11-22 incident), for a warning in Settings */
 std::vector<std::string> SystemPiecesFound();
 
-/* ---------------------------------------------------------------- finder (ndi-finder.cpp) */
+/* ---------------------------------------------------------------- registration */
 
-void FinderEnsureStarted();
-void FinderStop();
-std::vector<std::string> FinderSources();
+void RegisterOutputs(); /* ndi-output.cpp */
+void RegisterFilter();  /* ndi-filter.cpp */
 
-/* ---------------------------------------------------------------- source / output registration */
+/* ---------------------------------------------------------------- per-source senders (ndi-filter.cpp) */
 
-void RegisterSource();
-void RegisterOutput();
+/* Every NDI Output filter re-checks whether it should run (mode, pause, settings changes). UI thread. */
+void FiltersReconcileAll();
+/* Stops every per-source sender now (exit, profile / collection switch). UI thread. */
+void FiltersStopAll();
+/* The state line of one NDI Output filter ("Sending", "Waiting: …"), or empty if it isn't one */
+std::string FilterState(obs_source_t *filter);
 
-/* ---------------------------------------------------------------- sends (ndi-output.cpp) */
-
-int ActiveSends();
-uint64_t DroppedSendFrames();
+/* Prevents a profile / collection switch from racing a sender start (ndi-plugin.cpp) */
+bool Switching();
 
 } // namespace ctd_ndi

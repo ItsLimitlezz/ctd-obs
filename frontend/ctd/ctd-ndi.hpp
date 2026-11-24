@@ -32,10 +32,11 @@ struct CtdNdiStatus {
 	std::string version;
 	std::string installed;
 	std::string message;
-	int receivers = 0;
-	int maxReceivers = 0;
-	int sends = 0;
+	int senders = 0; /* running: program, vertical and per source */
+	int maxSenders = 0;
 	long long dropped = 0;
+	bool program = false;     /* "CTD OBS Program" is sending */
+	bool vertical = false;    /* "CTD OBS Vertical" is sending */
 	std::string systemPieces; /* newline-separated */
 };
 

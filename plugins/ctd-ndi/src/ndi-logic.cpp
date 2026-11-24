@@ -1,6 +1,6 @@
 /******************************************************************************
     CTD OBS NDI module: mode, allow-list matching, path policy, SHA-256 and
-    receiver slots (ndi-logic.hpp). No OBS or NDI dependency; unit-tested by
+    sender slots and rules (ndi-logic.hpp). No OBS or NDI dependency; unit-tested by
     test/ctd-ndi.
 
     Copyright (C) 2026 CineTech Digital
@@ -28,11 +28,8 @@ Mode ParseMode(const char *text)
 	if (!text) {
 		return Mode::Off;
 	}
-	if (strcmp(text, "receive") == 0) {
-		return Mode::Receive;
-	}
-	if (strcmp(text, "receive_send") == 0) {
-		return Mode::ReceiveSend;
+	if (strcmp(text, "send") == 0) {
+		return Mode::Send;
 	}
 	return Mode::Off;
 }
@@ -40,10 +37,8 @@ Mode ParseMode(const char *text)
 const char *ModeName(Mode mode)
 {
 	switch (mode) {
-	case Mode::Receive:
-		return "receive";
-	case Mode::ReceiveSend:
-		return "receive_send";
+	case Mode::Send:
+		return "send";
 	case Mode::Off:
 		break;
 	}
@@ -576,9 +571,9 @@ std::string Sha256File(const std::string &utf8Path)
 	return sha.FinalHex();
 }
 
-/* ------------------------------------------------------- receiver slots */
+/* --------------------------------------------------------- sender slots */
 
-bool ReceiverSlots::TryAcquire()
+bool SenderSlots::TryAcquire()
 {
 	int current = inUse.load();
 	while (current < max) {
@@ -589,7 +584,7 @@ bool ReceiverSlots::TryAcquire()
 	return false;
 }
 
-void ReceiverSlots::Release()
+void SenderSlots::Release()
 {
 	int current = inUse.load();
 	while (current > 0) {
@@ -597,6 +592,113 @@ void ReceiverSlots::Release()
 			return;
 		}
 	}
+}
+
+/* --------------------------------------------------------- sender rules */
+
+std::string CleanSenderName(const std::string &name)
+{
+	std::string out;
+	for (unsigned char c : name) {
+		if (c < 0x20 || c == 0x7f) {
+			continue; /* control characters, incl. newlines and tabs */
+		}
+		out += static_cast<char>(c);
+	}
+	const size_t first = out.find_first_not_of(' ');
+	if (first == std::string::npos) {
+		return std::string();
+	}
+	const size_t last = out.find_last_not_of(' ');
+	out = out.substr(first, last - first + 1);
+	if (out.size() > kMaxSenderNameBytes) {
+		size_t cut = kMaxSenderNameBytes;
+		/* back up to the start of a UTF-8 character */
+		while (cut > 0 && (static_cast<unsigned char>(out[cut]) & 0xC0) == 0x80) {
+			cut--;
+		}
+		out.resize(cut);
+		const size_t end = out.find_last_not_of(' ');
+		out.resize(end == std::string::npos ? 0 : end + 1);
+	}
+	return out;
+}
+
+SenderState DecideSender(const SenderInputs &in)
+{
+	if (!in.ndiOn) {
+		return SenderState::Off;
+	}
+	if (in.paused) {
+		return SenderState::Paused;
+	}
+	if (!in.filterEnabled) {
+		return SenderState::Disabled;
+	}
+	if (!in.sourceActive) {
+		return SenderState::Inactive;
+	}
+	if (!in.audioOnly && (in.width == 0 || in.height == 0)) {
+		return SenderState::NoSize;
+	}
+	if (!in.nameUsable) {
+		return SenderState::BadName;
+	}
+	if (in.nameTaken) {
+		return SenderState::NameTaken;
+	}
+	if (!in.slotFree) {
+		return SenderState::Limit;
+	}
+	return SenderState::Run;
+}
+
+const char *SenderStateText(SenderState state)
+{
+	switch (state) {
+	case SenderState::Off:
+		return "NDI is off";
+	case SenderState::Paused:
+		return "NDI is paused";
+	case SenderState::Disabled:
+		return "Stopped (filter disabled)";
+	case SenderState::Inactive:
+		return "Waiting: the source isn't on air";
+	case SenderState::NoSize:
+		return "Waiting: the source has no picture yet";
+	case SenderState::BadName:
+		return "No sender name";
+	case SenderState::NameTaken:
+		return "Another sender already uses this name";
+	case SenderState::Limit:
+		return "NDI sender limit reached";
+	case SenderState::Run:
+		break;
+	}
+	return "Sending";
+}
+
+void SenderCanvasSize(uint32_t width, uint32_t height, uint32_t &outWidth, uint32_t &outHeight)
+{
+	outWidth = 0;
+	outHeight = 0;
+	if (width == 0 || height == 0) {
+		return;
+	}
+	constexpr uint32_t kMax = 4096;
+	double w = width, h = height;
+	if (w > kMax || h > kMax) {
+		const double scale = std::min(kMax / w, kMax / h);
+		w *= scale;
+		h *= scale;
+	}
+	auto even = [](double v) {
+		uint32_t n = static_cast<uint32_t>(v);
+		n &= ~1u;
+		return n < 2 ? 2u : n;
+	};
+	outWidth = std::min(even(w), kMax);
+	outHeight = std::min(even(h), kMax);
 }
 
 } // namespace ctd_ndi

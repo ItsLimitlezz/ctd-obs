@@ -97,7 +97,7 @@ jobs:
           cmake --build build_ctd_plugins_test
           ctest --test-dir build_ctd_plugins_test --output-on-failure
 
-      # docs/ctd/ndi.md: the NDI allow-list, loader paths (never a system one), queue bounds, receiver cap and the
+      # docs/ctd/ndi.md: the NDI allow-list, loader paths (never a system one), queue bounds, sender cap and rules, the
       # memory watchdog's maths; also under AddressSanitizer / UBSan and ThreadSanitizer (the queue and slots are
       # shared between threads)
       - name: NDI tests
